@@ -1,4 +1,4 @@
-name: Build and Push Frontend Docker Image
+name: Build and Push Frontend Docker Image and Trigger Render Deployment
 
 on:
   push:
@@ -49,3 +49,10 @@ jobs:
             BUILD_CONFIGURATION=production
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Trigger Render Deployment
+        if: github.event_name != 'pull_request'
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          curl -s "$RENDER_DEPLOY_HOOK"
