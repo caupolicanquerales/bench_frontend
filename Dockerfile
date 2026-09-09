@@ -1,5 +1,5 @@
 ARG PROJECT_NAME=bench_frontend
-ARG NODE_VERSION=22-alpine
+ARG NODE_VERSION=24-alpine
 ARG BUILD_CONFIGURATION=production
 
 # Etapa 1: Compilación de la aplicación Angular
