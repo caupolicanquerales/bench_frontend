@@ -1,0 +1,18 @@
+server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /${LOCALE_PREFIX}index.html;
+    }
+
+    # Serve static assets directly and return 404 if missing to avoid
+    # rewrite loops when index.html is not present.
+    location ~* \.(?:js|css|png|jpg|jpeg|gif|ico|svg|woff2?|ttf|eot)$ {
+        try_files $uri =404;
+        access_log off;
+        expires 1y;
+    }
+}
