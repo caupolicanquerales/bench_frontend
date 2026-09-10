@@ -1,0 +1,246 @@
+:host {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Horizontal row of 5 equal-width metric cards spanning across the central canvas */
+.kpi-banner-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+}
+
+/* Base KPI Card Container & Elevation */
+.kpi-card {
+  box-sizing: border-box;
+  background: #ffffff;
+  /* Equal 3px left border and 1px other borders on all cards to eliminate sub-pixel box-model shifts */
+  border-top: 1px solid #f1f5f9;
+  border-right: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
+  border-left: 3px solid transparent;
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  min-height: 118px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px -2px rgba(15, 23, 42, 0.06);
+    border-top-color: #cbd5e1;
+    border-right-color: #cbd5e1;
+    border-bottom-color: #cbd5e1;
+
+    .filter-hint {
+      opacity: 1;
+    }
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+  }
+
+  /* Selected / Cross-filter active state */
+  &.is-selected {
+    border-top-color: #93c5fd;
+    border-right-color: #93c5fd;
+    border-bottom-color: #93c5fd;
+    border-left-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15), 0 4px 12px rgba(59, 130, 246, 0.06);
+
+    .filter-hint {
+      opacity: 1;
+      color: #2563eb;
+      font-weight: 700;
+    }
+  }
+
+  /* Primary Anchor Card (Distance): Subtle blue accent border and tint without layout shift */
+  &.accent-distance {
+    background: linear-gradient(180deg, #f0f7ff 0%, #ffffff 100%);
+    border-left-color: #2563eb;
+    border-top-color: #dbeafe;
+    border-right-color: #e2e8f0;
+    border-bottom-color: #e2e8f0;
+
+    .metric-icon-box {
+      color: #1d4ed8;
+      background: #dbeafe;
+      border-color: #bfdbfe;
+    }
+  }
+}
+
+/* 1. Contextual Metric Icon & Badge Row: Fixed height ensures uniform top baseline */
+.card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  margin-bottom: 0.625rem;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Unified Icon Container Styling across cards */
+.metric-icon-box {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+
+  svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+
+/* Standardized Metric Badges: Uniform vertical alignment and no ellipsis cut-off */
+.trend-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 9999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-sizing: border-box;
+
+  /* Time (-3:20): Green for time saved against targets */
+  &.badge-positive {
+    background: #ecfdf5;
+    color: #047857;
+    border: 1px solid #d1fae5;
+  }
+
+  /* Pace (+0:12): Amber warning for slower pace per km */
+  &.badge-warning {
+    background: #fffbeb;
+    color: #b45309;
+    border: 1px solid #fef3c7;
+  }
+
+  /* Primary Target Badge (Distance) */
+  &.badge-accent {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #dbeafe;
+  }
+
+  /* Neutral Badge (Calories, Elevation) */
+  &.badge-neutral {
+    background: #f8fafc;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+  }
+}
+
+/* 2 & 3. Primary Value and Typography / Unit Baseline Alignment */
+.metric-value-wrapper {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  height: 34px;
+  min-height: 34px;
+  margin-bottom: auto;
+  width: 100%;
+  min-width: 0;
+
+  .primary-value {
+    font-size: 1.625rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.025em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Muted measurement units with exact baseline alignment */
+  .unit-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #94a3b8;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+}
+
+/* 4. Metric Description & Filter Indicator */
+.card-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #f8fafc;
+  padding-top: 0.35rem;
+  margin-top: 0.5rem;
+  width: 100%;
+
+  .description-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .filter-hint {
+    font-size: 0.625rem;
+    color: #94a3b8;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    white-space: nowrap;
+  }
+}
+
+/* Compact Breakpoints: Hide secondary badges when width is constrained */
+@media (max-width: 1280px) {
+  .trend-badge.is-secondary-badge {
+    display: none;
+  }
+}
+
+/* Responsive Grid Breakpoints */
+@media (max-width: 1024px) {
+  .kpi-banner-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .kpi-banner-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  .kpi-card:last-child {
+    grid-column: span 2;
+  }
+}

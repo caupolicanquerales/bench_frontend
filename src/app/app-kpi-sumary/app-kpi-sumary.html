@@ -1,0 +1,93 @@
+<section class="kpi-banner-grid" aria-label="Core Activity Metrics">
+  @for (metric of metrics(); track metric.id) {
+    <article
+      class="kpi-card"
+      [class.is-primary]="metric.isPrimary"
+      [class.is-selected]="selectedMetricId() === metric.id"
+      [class.accent-distance]="metric.accentType === 'distance'"
+      [class.accent-time]="metric.accentType === 'time'"
+      [class.accent-pace]="metric.accentType === 'pace'"
+      [class.accent-elevation]="metric.accentType === 'elevation'"
+      [class.accent-calories]="metric.accentType === 'calories'"
+      (click)="selectMetric(metric.id)"
+      (mouseenter)="setHoveredMetric(metric.id)"
+      (mouseleave)="setHoveredMetric(null)"
+      tabindex="0"
+      role="button"
+      [attr.aria-pressed]="selectedMetricId() === metric.id"
+      [title]="metric.tooltip"
+    >
+      <!-- 1. Top Row: Contextual Metric Icon & Trend/Target Badge -->
+      <div class="card-top-row">
+        <div class="metric-icon-box" aria-hidden="true">
+          @switch (metric.accentType) {
+            @case ('distance') {
+              <!-- Route Pin Icon -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+            }
+            @case ('time') {
+              <!-- Stopwatch Icon -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="13" r="8"></circle>
+                <path d="M12 9v4l2 2m-2-11v2m-5-1l1.5 1.5M19 4l-1.5 1.5"></path>
+              </svg>
+            }
+            @case ('pace') {
+              <!-- Speedometer / Gauge Icon -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 14l3-3m-9.196-1.5A8.5 8.5 0 1 1 20.5 12"></path>
+                <circle cx="12" cy="14" r="1.5"></circle>
+              </svg>
+            }
+            @case ('elevation') {
+              <!-- Mountain Peak Icon -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m8 3 4 8 5-5 5 15H2L8 3z"></path>
+                <path d="m4.14 15 .86-1 2 2"></path>
+              </svg>
+            }
+            @case ('calories') {
+              <!-- Flame Icon -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path>
+              </svg>
+            }
+          }
+        </div>
+
+        @if (metric.badge; as badge) {
+          <span
+            class="trend-badge"
+            [class.badge-positive]="badge.type === 'positive'"
+            [class.badge-warning]="badge.type === 'warning'"
+            [class.badge-accent]="badge.type === 'accent'"
+            [class.badge-neutral]="badge.type === 'neutral'"
+            [class.is-secondary-badge]="!metric.isPrimary"
+            [title]="badge.text"
+          >
+            {{ badge.text }}
+          </span>
+        }
+      </div>
+
+      <!-- 2 & 3. Primary Numerical Value + Measurement Unit Label -->
+      <div class="metric-value-wrapper">
+        <span class="primary-value">{{ metric.value }}</span>
+        @if (metric.unit) {
+          <span class="unit-label">{{ metric.unit }}</span>
+        }
+      </div>
+
+      <!-- 4. Metric Description Label -->
+      <div class="card-bottom-row">
+        <span class="description-label">{{ metric.description }}</span>
+        <span class="filter-hint" aria-hidden="true">
+          {{ selectedMetricId() === metric.id ? '● Active' : 'Filter' }}
+        </span>
+      </div>
+    </article>
+  }
+</section>

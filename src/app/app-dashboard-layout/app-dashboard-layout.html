@@ -1,0 +1,205 @@
+<div class="dashboard-shell">
+  <!-- Mobile/Tablet Top Action Bar (visible <= 1024px) -->
+  <header class="mobile-top-bar" aria-label="Mobile Navigation Bar">
+    <button
+      type="button"
+      class="nav-toggle-btn"
+      (click)="toggleMobileNav()"
+      aria-label="Toggle Navigation Menu"
+      [attr.aria-expanded]="isMobileNavOpen()"
+    >
+      <span class="btn-icon">☰</span>
+      <span class="btn-label">Menu</span>
+    </button>
+
+    <div class="top-bar-brand">
+      <span class="brand-badge">⚡</span>
+      <span class="brand-title">Activity Hub</span>
+    </div>
+
+    <button
+      type="button"
+      class="contextual-toggle-btn"
+      (click)="toggleContextualDrawer()"
+      aria-label="Toggle Contextual Details"
+      [attr.aria-expanded]="isContextualDrawerOpen()"
+    >
+      <span class="btn-icon">💬</span>
+      <span class="btn-label">Social & Notes</span>
+      <span class="badge-pill">{{ comments().length }}</span>
+    </button>
+  </header>
+
+  <!-- Backdrop overlay when drawers are open on small screens -->
+  @if (isMobileNavOpen()) {
+    <div
+      class="drawer-backdrop"
+      (click)="closeMobileNav()"
+      role="button"
+      tabindex="0"
+      aria-label="Close menu backdrop"
+    ></div>
+  }
+  @if (isContextualDrawerOpen()) {
+    <div
+      class="drawer-backdrop"
+      (click)="closeContextualDrawer()"
+      role="button"
+      tabindex="0"
+      aria-label="Close details backdrop"
+    ></div>
+  }
+
+  <!-- Left Column: Navigation Sidebar (Dark Theme) -->
+  <aside
+    class="col-nav"
+    [class.is-open]="isMobileNavOpen()"
+    aria-label="Global Navigation"
+  >
+    <!-- Brand / Header area at the top of the sidebar -->
+    <div class="sidebar-brand-header">
+      <div class="brand-badge-icon">⚡</div>
+      <div class="brand-text-block">
+        <span class="brand-title">ApexTelemetry</span>
+        <span class="brand-subtitle">Performance Analytics</span>
+      </div>
+      <button
+        type="button"
+        class="drawer-close-btn mobile-only"
+        (click)="closeMobileNav()"
+        aria-label="Close Navigation"
+      >
+        ✕
+      </button>
+    </div>
+
+    <!-- Navigation content with internal padding -->
+    <div class="sidebar-nav-body">
+      <app-sidebar-nav></app-sidebar-nav>
+    </div>
+  </aside>
+
+  <!-- Center Column: Main Data Canvas (Light Theme) -->
+  <main class="col-main" aria-label="Main Data Canvas">
+    <div class="data-canvas-container">
+      <!-- 1. Header: Title block with activity details -->
+      <section class="canvas-section header-section" aria-label="Activity Header">
+        <app-activity-header></app-activity-header>
+      </section>
+
+      <!-- 2. Summary KPI Banner: Horizontal metric cards -->
+      <section class="canvas-section kpi-section" aria-label="KPI Summary">
+        <app-kpi-sumary></app-kpi-sumary>
+      </section>
+
+      <!-- 3. Interactive Map: Color-coded GPS track & controls -->
+      <section class="canvas-section map-section" aria-label="Interactive GPS Map">
+        <app-gps-map></app-gps-map>
+      </section>
+
+      <!-- 4. Telemetry Chart Block: Time-series line graphs & domain toggles -->
+      <section class="canvas-section chart-section" aria-label="Telemetry Chart Block">
+        <app-telemetry-chart></app-telemetry-chart>
+      </section>
+    </div>
+  </main>
+
+  <!-- Right Column: Contextual Sidebar (Light Theme) -->
+  <aside
+    class="col-contextual"
+    [class.is-open]="isContextualDrawerOpen()"
+    aria-label="Contextual Details and Community"
+  >
+    <div class="drawer-header mobile-only">
+      <span class="drawer-title">Social & Notes</span>
+      <button
+        type="button"
+        class="drawer-close-btn"
+        (click)="closeContextualDrawer()"
+        aria-label="Close Details"
+      >
+        ✕
+      </button>
+    </div>
+    <div class="contextual-inner">
+      <!-- Media Gallery -->
+      <section class="contextual-card media-gallery-card">
+        <div class="card-header-row">
+          <h3 class="card-title">
+            <span class="card-icon">📸</span> Media Gallery
+          </h3>
+          <span class="badge-count">3 items</span>
+        </div>
+        <p class="card-subtitle">Photos uploaded for this workout session</p>
+        <div class="media-grid">
+          <div class="media-item">
+            <img src="https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?w=300&auto=format&fit=crop&q=80" alt="Trail scenery" />
+          </div>
+          <div class="media-item">
+            <img src="https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=300&auto=format&fit=crop&q=80" alt="Morning sunrise along the ridge" />
+          </div>
+          <div class="media-item upload-tile" role="button" tabindex="0" title="Upload workout photo">
+            <span class="upload-icon">+</span>
+            <span class="upload-label">Add Photo</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Activity Notes -->
+      <section class="contextual-card activity-notes-card">
+        <div class="card-header-row">
+          <h3 class="card-title">
+            <span class="card-icon">📝</span> Activity Notes
+          </h3>
+        </div>
+        <p class="card-subtitle">Personal performance notes & observations</p>
+        <textarea
+          class="notes-textarea"
+          rows="4"
+          placeholder="Add workout notes, weather conditions, pacing sensations..."
+          [ngModel]="activityNotes()"
+          (ngModelChange)="activityNotes.set($event)"
+        ></textarea>
+      </section>
+
+      <!-- Social Feed / Comments -->
+      <section class="contextual-card social-feed-card">
+        <div class="card-header-row">
+          <h3 class="card-title">
+            <span class="card-icon">💬</span> Social & Comments
+          </h3>
+          <span class="badge-count">{{ comments().length }}</span>
+        </div>
+        
+        <div class="comment-list">
+          @for (comment of comments(); track comment.id) {
+            <article class="comment-bubble">
+              <img [src]="comment.avatar" [alt]="comment.author" class="comment-avatar" />
+              <div class="comment-content">
+                <header class="comment-meta">
+                  <span class="comment-author">{{ comment.author }}</span>
+                  <time class="comment-time">{{ comment.timeAgo }}</time>
+                </header>
+                <p class="comment-text">{{ comment.text }}</p>
+              </div>
+            </article>
+          }
+        </div>
+
+        <form class="comment-composer" (ngSubmit)="addComment()">
+          <input
+            type="text"
+            class="composer-input"
+            placeholder="Share kudos or drop a comment..."
+            [ngModel]="newCommentText()"
+            (ngModelChange)="newCommentText.set($event)"
+            name="newComment"
+          />
+          <button type="submit" class="composer-btn" [disabled]="!newCommentText().trim()">
+            Post
+          </button>
+        </form>
+      </section>
+    </div>
+  </aside>
+</div>

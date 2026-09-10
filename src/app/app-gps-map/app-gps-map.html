@@ -1,0 +1,73 @@
+<div class="map-viewport-wrapper">
+  <!-- Interactive Map Canvas Element Ref -->
+  <div
+    #mapCanvas
+    class="leaflet-map-canvas"
+    aria-label="Activity GPS interactive map with speed gradient overlay"
+  ></div>
+
+  <!-- Floating Controls & Badges Container -->
+  <div class="floating-controls-overlay" aria-label="Map Controls">
+    <!-- Top-Left: Weather & Environment Indicator Badge -->
+    <div class="map-badge weather-badge" role="status" title="Activity Ambient Weather">
+      <span class="badge-icon" aria-hidden="true">🌤️</span>
+      <div class="weather-text">
+        <span class="weather-temp">{{ weatherInfo().temp }}</span>
+        <span class="weather-desc">{{ weatherInfo().condition }}</span>
+        <span class="weather-wind">{{ weatherInfo().wind }}</span>
+      </div>
+    </div>
+
+    <!-- Top-Right: Google Maps Visual Style Switcher -->
+    <div class="layer-switcher-pill" role="toolbar" aria-label="Google Map Style Switcher">
+      @for (layer of availableLayers; track layer.id) {
+        <button
+          type="button"
+          class="layer-toggle-btn"
+          [class.active]="activeLayer() === layer.id"
+          (click)="switchLayer(layer.id)"
+          [title]="layer.description"
+          [attr.aria-pressed]="activeLayer() === layer.id"
+        >
+          {{ layer.label }}
+        </button>
+      }
+    </div>
+
+    <!-- Bottom-Left: Speed Gradient Legend & Hotline Toggle -->
+    <div class="telemetry-legend-badge">
+      <div class="legend-header">
+        <span class="legend-title">Speed Hotline</span>
+        <button
+          type="button"
+          class="hotline-toggle-btn"
+          [class.active]="isHotlineVisible()"
+          (click)="toggleHotline()"
+          title="Toggle Speed Gradient Track"
+        >
+          {{ isHotlineVisible() ? 'Visible' : 'Hidden' }}
+        </button>
+      </div>
+
+      <div class="gradient-bar-wrapper">
+        <span class="speed-label min-label">8 km/h</span>
+        <div class="speed-gradient-bar" aria-hidden="true"></div>
+        <span class="speed-label max-label">16+ km/h</span>
+      </div>
+
+      <div class="legend-footer">
+        <button type="button" class="recenter-link" (click)="recenterTrack()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="recenter-icon">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="22" y1="12" x2="18" y2="12"></line>
+            <line x1="6" y1="12" x2="2" y2="12"></line>
+            <line x1="12" y1="6" x2="12" y2="2"></line>
+            <line x1="12" y1="22" x2="12" y2="18"></line>
+          </svg>
+          Recenter
+        </button>
+        <span class="speed-metric">{{ currentSpeedMetric() }}</span>
+      </div>
+    </div>
+  </div>
+</div>
