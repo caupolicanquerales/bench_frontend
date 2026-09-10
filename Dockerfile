@@ -1,11 +1,8 @@
-ARG PROJECT_NAME=bench_frontend
 ARG NODE_VERSION=24-alpine
-ARG BUILD_CONFIGURATION=production
 
 # Etapa 1: Compilación de la aplicación Angular
 FROM node:${NODE_VERSION} AS build
-ARG PROJECT_NAME
-ARG BUILD_CONFIGURATION
+ARG BUILD_CONFIGURATION=production
 
 WORKDIR /app
 
@@ -19,13 +16,12 @@ RUN npm run build -- --configuration=${BUILD_CONFIGURATION}
 
 # Etapa 2: Servidor Nginx para servir los archivos estáticos
 FROM nginx:stable-alpine
-ARG PROJECT_NAME
 
 # Limpiar archivos por defecto de Nginx
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copiar artefactos compilados del cliente (browser)
-COPY --from=build /app/dist/${PROJECT_NAME}/browser/ /usr/share/nginx/html/
+# Copiar artefactos usando comodín para evitar errores de nombrado en dist
+COPY --from=build /app/dist/*/browser/ /usr/share/nginx/html/
 
 # Copiar configuración personalizada de Nginx para Angular SPA
 COPY nginx.conf /etc/nginx/conf.d/default.conf
