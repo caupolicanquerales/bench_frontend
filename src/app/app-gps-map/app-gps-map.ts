@@ -1,9 +1,11 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import {
   afterNextRender,
   Component,
   ElementRef,
+  inject,
   OnDestroy,
+  PLATFORM_ID,
   signal,
   ViewChild,
 } from '@angular/core';
@@ -29,6 +31,8 @@ export interface MapLayerConfig {
 })
 export class AppGpsMap implements OnDestroy {
   @ViewChild('mapCanvas') mapContainer!: ElementRef<HTMLDivElement>;
+
+  private readonly platformId = inject(PLATFORM_ID);
 
   // Component Signals and State
   protected isBrowser = true;
@@ -112,18 +116,53 @@ export class AppGpsMap implements OnDestroy {
   constructor() {
     // Executes strictly on the client browser after initial render
     afterNextRender(async () => {
-      // 1. Dynamically import Leaflet & Plugins only on browser
-      const L = await import('leaflet');
-      const hotlineModule: any = await import('leaflet-hotline');
-      if (typeof hotlineModule === 'function') {
-        hotlineModule(L);
-      } else if (typeof hotlineModule?.default === 'function') {
-        hotlineModule.default(L);
+      if (!isPlatformBrowser(this.platformId)) {
+        return;
       }
+
+      // 1. Resolve Leaflet: Prefer global L (from scripts bundle) to avoid ESM closure scope issues,
+      // fallback to dynamic import/require if not yet available
+      let L = typeof window !== 'undefined' ? (window as any).L : null;
+
+      if (!L) {
+        try {
+          const leafletMod: any = await import('leaflet');
+          L = leafletMod.default?.map
+            ? leafletMod.default
+            : (leafletMod.map ? leafletMod : (leafletMod.default ?? leafletMod));
+        } catch {
+          // If commonjs require is available in bundler context
+          if (typeof (window as any).require === 'function') {
+            L = (window as any).require('leaflet');
+          }
+        }
+      }
+
+      // Expose L globally so plugins can bind to it
+      if (typeof window !== 'undefined') {
+        (window as any).L = L;
+      }
+
+      // 2. Resolve leaflet-hotline plugin: ensure L.hotline is bound
+      if (L && !L.hotline) {
+        try {
+          const hotlineModule: any = await import('leaflet-hotline');
+          const hotlineFn = typeof hotlineModule === 'function'
+            ? hotlineModule
+            : (hotlineModule?.default ?? hotlineModule);
+
+          if (typeof hotlineFn === 'function') {
+            hotlineFn(L);
+          }
+        } catch (err) {
+          console.warn('Failed to load leaflet-hotline dynamically:', err);
+        }
+      }
+
       this.L = L;
 
-      // 2. Initialize Map manually
-      if (this.mapContainer?.nativeElement) {
+      // 3. Initialize Map manually
+      if (this.mapContainer?.nativeElement && L?.map) {
         this.mapInstance = L.map(this.mapContainer.nativeElement, {
           zoomControl: false,
           attributionControl: false,
@@ -146,7 +185,13 @@ export class AppGpsMap implements OnDestroy {
         );
         this.mapInstance.fitBounds(bounds, { padding: [40, 40] });
 
-        // Trigger size recalculation once layout settles
+        // Force canvas re-render and trigger size recalculations once layout settles
+        setTimeout(() => {
+          if (this.mapInstance) {
+            this.mapInstance.invalidateSize({ animate: false });
+          }
+        }, 300);
+
         [100, 250, 500].forEach((delay) => {
           setTimeout(() => {
             if (this.mapInstance) {
