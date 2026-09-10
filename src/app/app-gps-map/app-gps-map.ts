@@ -3,16 +3,20 @@ import {
   afterNextRender,
   Component,
   ElementRef,
+  OnDestroy,
   signal,
   ViewChild,
 } from '@angular/core';
 
-export type GoogleMapType = 'roadmap' | 'satellite' | 'terrain';
+export type MapLayerType = 'streets' | 'satellite' | 'dark' | 'terrain';
 
 export interface MapLayerConfig {
-  id: GoogleMapType;
+  id: MapLayerType;
   label: string;
-  lyrs: string;
+  url: string;
+  attribution: string;
+  subdomains?: string[];
+  maxZoom?: number;
   description: string;
 }
 
@@ -23,12 +27,12 @@ export interface MapLayerConfig {
   styleUrl: './app-gps-map.scss',
   templateUrl: './app-gps-map.html',
 })
-export class AppGpsMap {
+export class AppGpsMap implements OnDestroy {
   @ViewChild('mapCanvas') mapContainer!: ElementRef<HTMLDivElement>;
 
   // Component Signals and State
   protected isBrowser = true;
-  protected activeLayer = signal<GoogleMapType>('terrain');
+  protected activeLayer = signal<MapLayerType>('streets');
   protected isHotlineVisible = signal<boolean>(true);
   protected currentSpeedMetric = signal<string>('Avg: 12.4 km/h');
   protected weatherInfo = signal<{ temp: string; condition: string; wind: string }>({
@@ -37,25 +41,42 @@ export class AppGpsMap {
     wind: '12 km/h NW',
   });
 
-  // Available Google Map visual styles via lyrs parameter
+  // Reliable production-grade tile servers (OSM, CartoDB & Esri World Imagery)
   protected readonly availableLayers: MapLayerConfig[] = [
     {
-      id: 'roadmap',
-      label: 'Roadmap',
-      lyrs: 'm',
-      description: 'Standard Roadmap view (clean, high contrast)',
+      id: 'streets',
+      label: 'Streets',
+      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
+      subdomains: ['a', 'b', 'c'],
+      maxZoom: 19,
+      description: 'OpenStreetMap standard streets view (reliable, cloud-safe)',
     },
     {
-      id: 'satellite',
-      label: 'Satellite',
-      lyrs: 's',
-      description: 'Google Satellite imagery',
+      id: 'dark',
+      label: 'Dark',
+      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      attribution: '&copy; <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">CARTO</a>',
+      subdomains: ['a', 'b', 'c', 'd'],
+      maxZoom: 20,
+      description: 'CartoDB Dark Matter (high-contrast dashboard endurance theme)',
     },
     {
       id: 'terrain',
       label: 'Terrain',
-      lyrs: 'p',
-      description: 'Google Terrain / Hybrid (elevation & trails)',
+      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      attribution: '&copy; <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">CARTO</a>',
+      subdomains: ['a', 'b', 'c', 'd'],
+      maxZoom: 20,
+      description: 'CartoDB Voyager / Outdoor elevation style',
+    },
+    {
+      id: 'satellite',
+      label: 'Satellite',
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      attribution: 'Tiles &copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+      maxZoom: 19,
+      description: 'Esri World Imagery (high-resolution global satellite)',
     },
   ];
 
@@ -64,6 +85,7 @@ export class AppGpsMap {
   private hotlineLayer: any = null;
   private overlayGroup: any = null;
   private L: any = null;
+  private resizeObserver: ResizeObserver | null = null;
 
   // Sample GPS Track with latitude, longitude, and speed (km/h) for hotline
   private readonly gpsTrackPoints: [number, number, number][] = [
@@ -109,8 +131,8 @@ export class AppGpsMap {
 
         L.control.zoom({ position: 'bottomright' }).addTo(this.mapInstance);
 
-        // Apply Google Tile Layer
-        this.applyGoogleTileLayer(this.activeLayer());
+        // Apply initial tile layer
+        this.applyTileLayer(this.activeLayer());
 
         // Telemetry overlay group
         this.overlayGroup = L.layerGroup().addTo(this.mapInstance);
@@ -124,21 +146,46 @@ export class AppGpsMap {
         );
         this.mapInstance.fitBounds(bounds, { padding: [40, 40] });
 
-        // Invalidate map size after rendering settles
-        setTimeout(() => {
-          this.mapInstance?.invalidateSize();
-        }, 200);
+        // Trigger size recalculation once layout settles
+        [100, 250, 500].forEach((delay) => {
+          setTimeout(() => {
+            if (this.mapInstance) {
+              this.mapInstance.invalidateSize();
+            }
+          }, delay);
+        });
+
+        // Continuously adapt when container size changes
+        if (typeof ResizeObserver !== 'undefined') {
+          this.resizeObserver = new ResizeObserver(() => {
+            if (this.mapInstance) {
+              this.mapInstance.invalidateSize();
+            }
+          });
+          this.resizeObserver.observe(this.mapContainer.nativeElement);
+        }
       }
     });
   }
 
+  public ngOnDestroy(): void {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    if (this.mapInstance) {
+      this.mapInstance.remove();
+      this.mapInstance = null;
+    }
+  }
+
   /**
-   * Swap Google Map layer by altering `lyrs` URL parameter.
+   * Swap map tile layer style.
    */
-  public switchLayer(layerId: GoogleMapType): void {
+  public switchLayer(layerId: MapLayerType): void {
     this.activeLayer.set(layerId);
     if (this.mapInstance) {
-      this.applyGoogleTileLayer(layerId);
+      this.applyTileLayer(layerId);
     }
   }
 
@@ -175,25 +222,60 @@ export class AppGpsMap {
     this.mapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
   }
 
-  private applyGoogleTileLayer(type: GoogleMapType): void {
+  /**
+   * Apply selected tile layer with automatic fallback to OpenStreetMap if loading fails.
+   */
+  private applyTileLayer(type: MapLayerType): void {
     if (!this.mapInstance || !this.L) {
       return;
     }
 
     const config = this.availableLayers.find((l) => l.id === type) ?? this.availableLayers[0];
-    const googleTilesUrl = `https://mt1.google.com/vt/lyrs=${config.lyrs}&x={x}&y={y}&z={z}`;
 
     if (this.currentTileLayer) {
       this.mapInstance.removeLayer(this.currentTileLayer);
+      this.currentTileLayer = null;
     }
 
-    this.currentTileLayer = this.L.tileLayer(googleTilesUrl, {
-      maxZoom: 20,
-      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-      attribution: '&copy; Google Maps',
-    }).addTo(this.mapInstance);
+    const tileOptions: any = {
+      maxZoom: config.maxZoom ?? 19,
+      attribution: config.attribution,
+    };
 
-    this.currentTileLayer.bringToBack();
+    if (config.subdomains && config.subdomains.length > 0) {
+      tileOptions.subdomains = config.subdomains;
+    }
+
+    try {
+      this.currentTileLayer = this.L.tileLayer(config.url, tileOptions).addTo(this.mapInstance);
+
+      // Robust fallback: if tiles fail (e.g., external tile service 403 or network issue), fall back to OpenStreetMap
+      let fallbackTriggered = false;
+      this.currentTileLayer.on('tileerror', () => {
+        if (!fallbackTriggered && config.id !== 'streets' && this.mapInstance) {
+          fallbackTriggered = true;
+          const fallbackOsmUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+          this.mapInstance.removeLayer(this.currentTileLayer);
+          this.currentTileLayer = this.L.tileLayer(fallbackOsmUrl, {
+            maxZoom: 19,
+            subdomains: ['a', 'b', 'c'],
+            attribution: '&copy; OpenStreetMap contributors',
+          }).addTo(this.mapInstance);
+          this.currentTileLayer.bringToBack();
+        }
+      });
+
+      this.currentTileLayer.bringToBack();
+    } catch {
+      // Fallback directly to OSM if initialization throws
+      const fallbackOsmUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+      this.currentTileLayer = this.L.tileLayer(fallbackOsmUrl, {
+        maxZoom: 19,
+        subdomains: ['a', 'b', 'c'],
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(this.mapInstance);
+      this.currentTileLayer.bringToBack();
+    }
   }
 
   private buildHotlineLayer(L: any): void {
