@@ -21,11 +21,13 @@ FROM nginx:stable-alpine
 ARG COMMIT_SHA=unknown
 ENV BUILD_SHA=${COMMIT_SHA}
 
+# Clear default Nginx static files
 RUN rm -rf /usr/share/nginx/html/*
 
-# Fallback COPY using wildcard to extract all nested browser assets directly into Nginx root
-COPY --from=build /app/dist/bench_frontend/browser/* /usr/share/nginx/html/
+# Copy built Angular browser assets directly into root
+COPY --from=build /app/dist/bench_frontend/browser/. /usr/share/nginx/html/
 
+# Copy Nginx SPA configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
