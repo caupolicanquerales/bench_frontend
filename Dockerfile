@@ -27,6 +27,9 @@ RUN rm -rf /usr/share/nginx/html/*
 # Copy built Angular browser assets directly into root
 COPY --from=build /app/dist/bench_frontend/browser/. /usr/share/nginx/html/
 
+# Rename index.csr.html to index.html if it exists
+RUN if [ -f /usr/share/nginx/html/index.csr.html ]; then mv /usr/share/nginx/html/index.csr.html /usr/share/nginx/html/index.html; fi
+
 # Copy Nginx SPA configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
