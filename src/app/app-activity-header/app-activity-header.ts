@@ -10,21 +10,35 @@ import { FormsModule } from '@angular/forms';
 })
 export class AppActivityHeader {
   // Activity identity state
-  protected activityTitle = signal('Ciudad de Buenos Aires Carrera');
-  protected isEditingTitle = signal(false);
-  protected editTitleDraft = signal('');
-  protected activitySubtitle = signal('Running • Sunday Morning Session');
+  public activityTitle = signal('Ciudad de Buenos Aires Carrera');
+  public isEditingTitle = signal(false);
+  public editTitleDraft = signal('');
+  public activitySubtitle = signal('Running • Sunday Morning Session');
 
-  // Authentication state
-  protected isSignedIn = signal(true);
-  protected userName = signal('Matías Albornoz');
-  protected isConnected = signal(true);
-  protected userAvatar = signal(
+  // Authentication & User Profile state
+  public isSignedIn = signal(true);
+  public userName = signal('Matías Albornoz');
+  public userEmail = signal('matias@apextelemetry.io');
+  public userRole = signal('Pro Athlete');
+  public userTeam = signal('Apex Endurance Team');
+  public isConnected = signal(true);
+  public userAvatar = signal(
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'
   );
 
   // Profile dropdown menu state
-  protected isProfileMenuOpen = signal(false);
+  public isProfileMenuOpen = signal(false);
+  public isSwitchingTeam = signal(false);
+  public availableTeams = signal([
+    'Apex Endurance Team',
+    'Buenos Aires Striders',
+    'Personal Solo Athlete',
+  ]);
+
+  // User Preferences state
+  public isDarkMode = signal(false);
+  public selectedLanguage = signal<'EN' | 'ES'>('EN');
+  public activeFeedback = signal<string | null>(null);
 
   // Title edit handlers
   protected startEditingTitle(): void {
@@ -45,29 +59,103 @@ export class AppActivityHeader {
   }
 
   // Profile dropdown handlers
-  protected toggleProfileMenu(event: MouseEvent): void {
+  public toggleProfileMenu(event: MouseEvent): void {
     event.stopPropagation();
     this.isProfileMenuOpen.update((open) => !open);
+    if (!this.isProfileMenuOpen()) {
+      this.isSwitchingTeam.set(false);
+    }
   }
 
-  protected closeProfileMenu(): void {
+  public closeProfileMenu(): void {
     this.isProfileMenuOpen.set(false);
+    this.isSwitchingTeam.set(false);
+  }
+
+  // Profile Management handlers
+  public viewProfile(): void {
+    this.showFeedback('Navigating to full Athlete Profile...');
+    this.closeProfileMenu();
+  }
+
+  public editUserDetails(): void {
+    this.showFeedback('Opening Athlete Bio & Training Zones editor...');
+    this.closeProfileMenu();
+  }
+
+  public toggleTeamSwitcher(): void {
+    this.isSwitchingTeam.update((v) => !v);
+  }
+
+  public selectTeam(team: string): void {
+    this.userTeam.set(team);
+    this.isSwitchingTeam.set(false);
+    this.showFeedback(`Switched team to "${team}"`);
+  }
+
+  public openSettings(): void {
+    this.showFeedback('Opening Account & Security Settings...');
+    this.closeProfileMenu();
+  }
+
+  // Preferences handlers
+  public toggleTheme(): void {
+    this.isDarkMode.update((dark) => !dark);
+    if (typeof document !== 'undefined') {
+      if (this.isDarkMode()) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+    this.showFeedback(this.isDarkMode() ? 'Switched to Dark Mode' : 'Switched to Light Mode');
+  }
+
+  public toggleLanguage(): void {
+    const nextLang = this.selectedLanguage() === 'EN' ? 'ES' : 'EN';
+    this.selectedLanguage.set(nextLang);
+    this.showFeedback(nextLang === 'EN' ? 'Language set to English' : 'Idioma cambiado a Español');
+  }
+
+  private feedbackTimer: ReturnType<typeof setTimeout> | null = null;
+  public showFeedback(msg: string): void {
+    this.activeFeedback.set(msg);
+    if (this.feedbackTimer) {
+      clearTimeout(this.feedbackTimer);
+    }
+    this.feedbackTimer = setTimeout(() => {
+      this.activeFeedback.set(null);
+    }, 3000);
+  }
+
+  public dismissFeedback(): void {
+    this.activeFeedback.set(null);
   }
 
   // Auth toggle simulation
-  protected signIn(): void {
+  public signIn(): void {
     this.isSignedIn.set(true);
     this.isConnected.set(true);
+    this.showFeedback('Signed in as Matías Albornoz');
   }
 
-  protected signOut(): void {
+  public register(): void {
+    this.isSignedIn.set(true);
+    this.isConnected.set(true);
+    this.showFeedback('Welcome! Registered athlete account created.');
+  }
+
+  public signOut(): void {
     this.isSignedIn.set(false);
+    this.isConnected.set(false);
     this.isProfileMenuOpen.set(false);
+    this.isSwitchingTeam.set(false);
+    this.showFeedback('Signed out. Viewing session as Guest.');
   }
 
   // Close dropdown on outside click
   @HostListener('document:click')
-  protected onDocumentClick(): void {
+  public onDocumentClick(): void {
     if (this.isProfileMenuOpen()) {
       this.closeProfileMenu();
     }

@@ -102,33 +102,151 @@
         <!-- Floating Profile Dropdown Menu -->
         @if (isProfileMenuOpen()) {
           <div
-            class="profile-dropdown-menu"
+            class="profile-dropdown-menu avatar-dropdown-menu"
             role="menu"
             (click)="$event.stopPropagation()"
           >
+            <!-- 1. Non-redundant Identity Header:
+                 Replaces duplicate user name with role tier, email, and quick View Profile CTA -->
             <div class="dropdown-header">
-              <span class="dropdown-user-name">{{ userName() }}</span>
-              <span class="dropdown-user-email">matias&#64;apextelemetry.io</span>
+              <div class="user-meta-top">
+                <span class="role-badge user-badge">{{ userRole() }}</span>
+                <span class="user-email-text user-email">{{ userEmail() }}</span>
+              </div>
+              <button
+                type="button"
+                class="view-profile-cta-btn"
+                (click)="viewProfile()"
+                role="menuitem"
+                title="View full athlete profile"
+              >
+                <span>View Profile</span>
+                <span class="arrow-icon" aria-hidden="true">→</span>
+              </button>
             </div>
 
             <div class="dropdown-divider"></div>
 
+            <!-- 2. Profile Management & Actions -->
+            <div class="menu-section-label">Account & Team</div>
             <ul class="dropdown-items-list">
               <li>
                 <button
                   type="button"
-                  class="dropdown-item"
-                  (click)="closeProfileMenu()"
+                  class="dropdown-item primary-action"
+                  (click)="openSettings()"
                   role="menuitem"
                 >
                   <span class="item-icon">⚙️</span>
-                  <span>Account Settings</span>
+                  <span class="item-label">Account Settings</span>
                 </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item"
+                  (click)="editUserDetails()"
+                  role="menuitem"
+                >
+                  <span class="item-icon">✏️</span>
+                  <span class="item-label">Edit Athlete Details</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item team-switcher-toggle"
+                  (click)="toggleTeamSwitcher()"
+                  role="menuitem"
+                  [attr.aria-expanded]="isSwitchingTeam()"
+                >
+                  <span class="item-icon">👥</span>
+                  <div class="item-label-group">
+                    <span class="item-label">Switch Team / Account</span>
+                    <span class="item-subtitle">{{ userTeam() }}</span>
+                  </div>
+                  <span class="chevron-indicator" [class.expanded]="isSwitchingTeam()">▾</span>
+                </button>
+                @if (isSwitchingTeam()) {
+                  <ul class="sub-teams-list">
+                    @for (team of availableTeams(); track team) {
+                      <li>
+                        <button
+                          type="button"
+                          class="team-option-btn"
+                          [class.active]="team === userTeam()"
+                          (click)="selectTeam(team)"
+                        >
+                          <span class="team-bullet" [class.selected]="team === userTeam()"></span>
+                          <span class="team-name">{{ team }}</span>
+                          @if (team === userTeam()) {
+                            <span class="team-check">✓</span>
+                          }
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                }
               </li>
             </ul>
 
             <div class="dropdown-divider"></div>
 
+            <!-- 3. Preferences / Theme & Language Toggles -->
+            <div class="menu-section-label">Preferences</div>
+            <div class="preferences-controls-group">
+              <!-- Dark / Light Theme Toggle -->
+              <div class="pref-row">
+                <div class="pref-label">
+                  <span class="pref-icon">🎨</span>
+                  <span>Theme</span>
+                </div>
+                <div class="theme-toggle-switch">
+                  <button
+                    type="button"
+                    class="theme-pill-btn"
+                    [class.active]="!isDarkMode()"
+                    (click)="!isDarkMode() ? null : toggleTheme()"
+                    title="Switch to Light mode"
+                    aria-label="Light mode"
+                  >
+                    ☀️ Light
+                  </button>
+                  <button
+                    type="button"
+                    class="theme-pill-btn"
+                    [class.active]="isDarkMode()"
+                    (click)="isDarkMode() ? null : toggleTheme()"
+                    title="Switch to Dark mode"
+                    aria-label="Dark mode"
+                  >
+                    🌙 Dark
+                  </button>
+                </div>
+              </div>
+
+              <!-- Language Preference -->
+              <div class="pref-row">
+                <div class="pref-label">
+                  <span class="pref-icon">🌐</span>
+                  <span>Language</span>
+                </div>
+                <button
+                  type="button"
+                  class="lang-pill-btn"
+                  (click)="toggleLanguage()"
+                  title="Toggle language"
+                  aria-label="Toggle language"
+                >
+                  <span class="lang-flag">{{ selectedLanguage() === 'EN' ? '🇺🇸' : '🇪🇸' }}</span>
+                  <span class="lang-code">{{ selectedLanguage() === 'EN' ? 'English (US)' : 'Español' }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="dropdown-divider"></div>
+
+            <!-- 4. Sign Out Visual Hierarchy: subtle and non-dominant -->
             <div class="dropdown-footer">
               <button
                 type="button"
@@ -144,23 +262,59 @@
         }
       </div>
     } @else {
-      <!-- Guest View (When Signed Out) -->
-      <div class="guest-auth-actions">
-        <button
-          type="button"
-          class="btn-auth btn-signin"
-          (click)="signIn()"
-        >
-          Sign In
-        </button>
-        <button
-          type="button"
-          class="btn-auth btn-register"
-          (click)="signIn()"
-        >
-          Register
-        </button>
+      <!-- 5. Registration / Guest State:
+           Distinct Sign In / Register prompt instead of misleading Connected status or profile modal -->
+      <div class="guest-auth-container" role="region" aria-label="Guest Access">
+        <div class="guest-badge-info">
+          <div class="guest-avatar-placeholder" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="guest-svg-icon">
+              <path
+                fill-rule="evenodd"
+                d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </div>
+          <div class="guest-text-meta">
+            <span class="guest-title">Guest Explorer</span>
+            <span class="guest-subtitle">Sign in to sync telemetry</span>
+          </div>
+        </div>
+
+        <div class="guest-auth-actions">
+          <button
+            type="button"
+            class="btn-auth btn-signin"
+            (click)="signIn()"
+            title="Sign in to your account"
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            class="btn-auth btn-register"
+            (click)="register()"
+            title="Create an athlete account"
+          >
+            Register
+          </button>
+        </div>
       </div>
     }
   </div>
+
+  <!-- Toast Notification / User Feedback Banner -->
+  @if (activeFeedback()) {
+    <div class="header-feedback-toast" role="status" aria-live="polite">
+      <span class="toast-text">{{ activeFeedback() }}</span>
+      <button
+        type="button"
+        class="toast-close-btn"
+        (click)="dismissFeedback()"
+        aria-label="Dismiss feedback message"
+      >
+        ✕
+      </button>
+    </div>
+  }
 </header>
