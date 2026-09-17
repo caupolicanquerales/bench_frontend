@@ -1,5 +1,6 @@
 import { Component, HostListener, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '../services/auth-service';
 
 @Component({
   imports: [FormsModule],
@@ -39,6 +40,8 @@ export class AppActivityHeader {
   public isDarkMode = signal(false);
   public selectedLanguage = signal<'EN' | 'ES'>('EN');
   public activeFeedback = signal<string | null>(null);
+
+  constructor(private authService:AuthService) {}
 
   // Title edit handlers
   protected startEditingTitle(): void {
@@ -136,13 +139,13 @@ export class AppActivityHeader {
   public signIn(): void {
     this.isSignedIn.set(true);
     this.isConnected.set(true);
-    this.showFeedback('Signed in as Matías Albornoz');
+    this.authService.login();
   }
 
   public register(): void {
     this.isSignedIn.set(true);
     this.isConnected.set(true);
-    this.showFeedback('Welcome! Registered athlete account created.');
+    this.authService.login();
   }
 
   public signOut(): void {
@@ -150,7 +153,7 @@ export class AppActivityHeader {
     this.isConnected.set(false);
     this.isProfileMenuOpen.set(false);
     this.isSwitchingTeam.set(false);
-    this.showFeedback('Signed out. Viewing session as Guest.');
+    //this.authService.logout();
   }
 
   // Close dropdown on outside click

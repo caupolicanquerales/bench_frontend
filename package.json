@@ -22,6 +22,7 @@
     "@angular/ssr": "^22.1.7",
     "@bluehalo/ngx-leaflet": "^22.0.0",
     "@popperjs/core": "^2.11.8",
+    "angular-oauth2-oidc": "^22.0.2",
     "bootstrap": "^5.3.8",
     "echarts": "^6.1.0",
     "express": "^5.1.0",

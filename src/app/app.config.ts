@@ -7,6 +7,8 @@ import * as echarts from 'echarts/core';
 import { BarChart, LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, LegendComponent, TitleComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
+import { provideOAuthClient } from 'angular-oauth2-oidc';
+import { provideHttpClient } from '@angular/common/http';
 
 echarts.use([
   BarChart,
@@ -24,6 +26,8 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideClientHydration(),
-    provideEchartsCore({ echarts })
+    provideEchartsCore({ echarts }),
+    provideHttpClient(),
+    provideOAuthClient() 
   ]
 };
