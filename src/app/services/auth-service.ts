@@ -18,15 +18,16 @@ export class AuthService {
     }
 
     private async configureOAuth(): Promise<void> {
-        await this.configService.loadConfig();
-        const config = createAuthConfig(this.configService.apiGatewayUrl);
-        this.oauthService.configure(config);
+        try {
+            await this.configService.loadConfig();
+            const config = createAuthConfig(this.configService.apiGatewayUrl);
+            this.oauthService.configure(config);
 
-        this.oauthService.loadDiscoveryDocumentAndTryLogin().then(() => {
+            await this.oauthService.loadDiscoveryDocumentAndTryLogin();
             console.log('OAuth configured successfully');
-        }).catch(err => {
-            console.error('Error initializing OAuth', err);
-        });
+        } catch (err) {
+            console.error('Error initializing OAuth:', err);
+        }
     }
 
     login(): void {

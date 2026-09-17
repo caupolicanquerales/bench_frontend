@@ -9,7 +9,7 @@ export interface AppConfig {
 })
 export class ConfigService {
   private config: AppConfig = {
-    apiGatewayUrl: 'http://localhost:8082'
+    apiGatewayUrl: ''
   };
 
   async loadConfig(): Promise<void> {
@@ -25,6 +25,19 @@ export class ConfigService {
   }
 
   get apiGatewayUrl(): string {
-    return this.config.apiGatewayUrl.replace(/\/+$/, '');
+    // If explicitly configured with a non-localhost remote URL, use it
+    if (this.config.apiGatewayUrl && !this.config.apiGatewayUrl.includes('localhost')) {
+      return this.config.apiGatewayUrl.replace(/\/+$/, '');
+    }
+
+    // In browser on Render: default to the Render API gateway
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      if (host.includes('onrender.com')) {
+        return 'https://bench-api-gateway.onrender.com';
+      }
+    }
+
+    return (this.config.apiGatewayUrl || 'http://localhost:8082').replace(/\/+$/, '');
   }
 }
