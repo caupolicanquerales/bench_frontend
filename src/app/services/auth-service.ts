@@ -36,9 +36,24 @@ export class AuthService {
         }
     }
 
+    register(): void {
+        if (isPlatformBrowser(this.platformId)) {
+            window.location.href = `${this.configService.apiGatewayUrl}/register`;
+        }
+    }
+
     logout(): void {
         if (isPlatformBrowser(this.platformId)) {
-            this.oauthService.logOut();
+            // Revoke local tokens and clear stored OAuth state
+            try {
+                this.oauthService.logOut(true);
+            } catch {
+                // If token revocation fails or tokens are expired, continue clearing local storage
+            }
+
+            // Invalidate Spring Security session, delete cookies, and redirect to login.html with ?logout=true
+            const gatewayUrl = this.configService.apiGatewayUrl;
+            window.location.href = `${gatewayUrl}/logout`;
         }
     }
 

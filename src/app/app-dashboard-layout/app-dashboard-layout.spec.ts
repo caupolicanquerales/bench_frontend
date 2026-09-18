@@ -1,13 +1,25 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AppDashboardLayout } from './app-dashboard-layout';
+import { AuthService } from '../services/auth-service';
 
 describe('AppDashboardLayout', () => {
   let component: AppDashboardLayout;
   let fixture: ComponentFixture<AppDashboardLayout>;
 
   beforeEach(async () => {
+    const mockAuthService = {
+      login: () => {},
+      register: () => {},
+      logout: () => {},
+      isLogged: false,
+      token: ''
+    };
+
     await TestBed.configureTestingModule({
       imports: [AppDashboardLayout],
+      providers: [
+        { provide: AuthService, useValue: mockAuthService }
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(AppDashboardLayout);

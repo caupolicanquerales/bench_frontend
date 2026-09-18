@@ -145,7 +145,7 @@ export class AppActivityHeader {
   public register(): void {
     this.isSignedIn.set(true);
     this.isConnected.set(true);
-    this.authService.login();
+    this.authService.register();
   }
 
   public signOut(): void {
@@ -153,7 +153,7 @@ export class AppActivityHeader {
     this.isConnected.set(false);
     this.isProfileMenuOpen.set(false);
     this.isSwitchingTeam.set(false);
-    //this.authService.logout();
+    this.authService.logout();
   }
 
   // Close dropdown on outside click

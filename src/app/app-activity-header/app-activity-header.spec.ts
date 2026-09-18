@@ -1,13 +1,32 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AppActivityHeader } from './app-activity-header';
+import { AuthService } from '../services/auth-service';
 
 describe('AppActivityHeader', () => {
   let component: AppActivityHeader;
   let fixture: ComponentFixture<AppActivityHeader>;
+  let mockAuthService: {
+    login: () => void;
+    register: () => void;
+    logout: () => void;
+    isLogged: boolean;
+    token: string;
+  };
 
   beforeEach(async () => {
+    mockAuthService = {
+      login: () => {},
+      register: () => {},
+      logout: () => {},
+      isLogged: false,
+      token: ''
+    };
+
     await TestBed.configureTestingModule({
       imports: [AppActivityHeader],
+      providers: [
+        { provide: AuthService, useValue: mockAuthService }
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(AppActivityHeader);
@@ -109,6 +128,11 @@ describe('AppActivityHeader', () => {
 
   describe('Sign Out Visual Hierarchy and Flow', () => {
     it('should contain a sign out option that signs the user out', () => {
+      let logoutCalled = false;
+      mockAuthService.logout = () => {
+        logoutCalled = true;
+      };
+
       component.isProfileMenuOpen.set(true);
       fixture.detectChanges();
 
@@ -120,6 +144,7 @@ describe('AppActivityHeader', () => {
 
       expect(component.isSignedIn()).toBe(false);
       expect(component.isProfileMenuOpen()).toBe(false);
+      expect(logoutCalled).toBe(true);
     });
   });
 
@@ -160,12 +185,18 @@ describe('AppActivityHeader', () => {
     });
 
     it('should register and sign in user when clicking Register', () => {
+      let registerCalled = false;
+      mockAuthService.register = () => {
+        registerCalled = true;
+      };
+
       const registerBtn = fixture.nativeElement.querySelector('.btn-register') as HTMLButtonElement;
       registerBtn.click();
       fixture.detectChanges();
 
       expect(component.isSignedIn()).toBe(true);
       expect(component.isConnected()).toBe(true);
+      expect(registerCalled).toBe(true);
     });
   });
 });
