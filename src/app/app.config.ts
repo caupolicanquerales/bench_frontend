@@ -1,4 +1,4 @@
-import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZoneChangeDetection } from '@angular/core';
+import { ApplicationConfig, provideAppInitializer, inject, provideBrowserGlobalErrorListeners, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { routes } from './app.routes';
 import { provideClientHydration } from '@angular/platform-browser';
@@ -9,6 +9,7 @@ import { GridComponent, TooltipComponent, LegendComponent, TitleComponent } from
 import { CanvasRenderer } from 'echarts/renderers';
 import { provideOAuthClient } from 'angular-oauth2-oidc';
 import { provideHttpClient } from '@angular/common/http';
+import { AuthService } from './services/auth-service';
 
 echarts.use([
   BarChart,
@@ -28,6 +29,10 @@ export const appConfig: ApplicationConfig = {
     provideClientHydration(),
     provideEchartsCore({ echarts }),
     provideHttpClient(),
-    provideOAuthClient() 
+    provideOAuthClient(),
+    provideAppInitializer(() => {
+      const authService = inject(AuthService);
+      return authService.runInitialLoginSequence();
+    })
   ]
 };

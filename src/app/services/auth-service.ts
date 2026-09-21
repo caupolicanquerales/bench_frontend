@@ -10,29 +10,49 @@ import { ConfigService } from './config.service';
 export class AuthService {
     private platformId = inject(PLATFORM_ID);
     private configService = inject(ConfigService);
+    private initPromise: Promise<boolean> | null = null;
 
     constructor(private oauthService: OAuthService) {
-        if (isPlatformBrowser(this.platformId)) {
-            this.configureOAuth();
-        }
+        // Initialization handled via provideAppInitializer
     }
 
-    private async configureOAuth(): Promise<void> {
+    public runInitialLoginSequence(): Promise<boolean> {
+        if (!isPlatformBrowser(this.platformId)) {
+            return Promise.resolve(false);
+        }
+        if (!this.initPromise) {
+            this.initPromise = this.configureOAuth();
+        }
+        return this.initPromise;
+    }
+
+    private async configureOAuth(): Promise<boolean> {
         try {
             await this.configService.loadConfig();
             const config = createAuthConfig(this.configService.apiGatewayUrl);
             this.oauthService.configure(config);
 
             await this.oauthService.loadDiscoveryDocumentAndTryLogin();
-            console.log('OAuth configured successfully');
+
+            if (this.oauthService.hasValidAccessToken()) {
+                this.oauthService.setupAutomaticSilentRefresh();
+            }
+
+            console.log('OAuth configured successfully. Valid access token:', this.oauthService.hasValidAccessToken());
+            return this.oauthService.hasValidAccessToken();
         } catch (err) {
             console.error('Error initializing OAuth:', err);
+            return false;
         }
     }
 
-    login(): void {
+    async login(targetUrl?: string): Promise<void> {
         if (isPlatformBrowser(this.platformId)) {
-            this.oauthService.initCodeFlow(); // Redirects browser to Auth Server via Gateway
+            await this.runInitialLoginSequence();
+            if (this.oauthService.hasValidAccessToken()) {
+                return;
+            }
+            this.oauthService.initCodeFlow(targetUrl); // Redirects browser to Auth Server via Gateway
         }
     }
 
@@ -64,5 +84,8 @@ export class AuthService {
     get token(): string {
         return isPlatformBrowser(this.platformId) ? this.oauthService.getAccessToken() : '';
     }
-  
+    
+    hasValidAccessToken(): boolean {
+        return isPlatformBrowser(this.platformId) && this.oauthService.hasValidAccessToken();
+    }
 }
