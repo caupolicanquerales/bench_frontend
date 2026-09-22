@@ -1,9 +1,10 @@
-import { Component, HostListener, signal } from '@angular/core';
+import { Component, HostListener, effect, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../services/auth-service';
+import { UploadButton } from '../shared/components/upload-button/upload-button';
 
 @Component({
-  imports: [FormsModule],
+  imports: [FormsModule, UploadButton],
   selector: 'app-activity-header',
   standalone: true,
   styleUrl: './app-activity-header.scss',
@@ -16,14 +17,18 @@ export class AppActivityHeader {
   public editTitleDraft = signal('');
   public activitySubtitle = signal('Running • Sunday Morning Session');
 
-  // Authentication & User Profile state
-  public isSignedIn = signal(true);
-  public userName = signal('Matías Albornoz');
-  public userEmail = signal('matias@apextelemetry.io');
-  public userRole = signal('Pro Athlete');
-  public userTeam = signal('Apex Endurance Team');
-  public isConnected = signal(true);
-  public userAvatar = signal(
+  // File import action
+  public fileImported = output<File>();
+  public isImporting = signal(false);
+
+  // Authentication & User Profile state (bound to AuthService)
+  public isSignedIn = signal<boolean>(true);
+  public isConnected = signal<boolean>(true);
+  public userName = signal<string>('Matías Albornoz');
+  public userEmail = signal<string>('matias@apextelemetry.io');
+  public userRole = signal<string>('Pro Athlete');
+  public userTeam = signal<string>('Apex Endurance Team');
+  public userAvatar = signal<string>(
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'
   );
 
@@ -41,7 +46,55 @@ export class AppActivityHeader {
   public selectedLanguage = signal<'EN' | 'ES'>('EN');
   public activeFeedback = signal<string | null>(null);
 
-  constructor(private authService:AuthService) {}
+  constructor(private authService: AuthService) {
+    if (typeof this.authService.currentUser === 'function') {
+      effect(() => {
+        const user = this.authService.currentUser();
+        const signedIn = typeof this.authService.isSignedIn === 'function'
+          ? this.authService.isSignedIn()
+          : this.authService.isLogged;
+        this.isSignedIn.set(signedIn);
+        this.isConnected.set(
+          typeof this.authService.isConnected === 'function'
+            ? this.authService.isConnected()
+            : this.authService.isLogged
+        );
+
+        if (user) {
+          this.userName.set(user.fullName || user.username || 'Athlete');
+          this.userEmail.set(user.email || '');
+          if (user.roles && user.roles.length > 0) {
+            const formattedRole = user.roles[0]
+              .replace(/^ROLE_/, '')
+              .split('_')
+              .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+              .join(' ');
+            this.userRole.set(formattedRole);
+          }
+          if (user.avatarUrl) {
+            this.userAvatar.set(user.avatarUrl);
+          }
+        } else if (!signedIn) {
+          this.userName.set('Guest');
+          this.userEmail.set('');
+          this.userRole.set('Guest');
+        }
+      });
+    }
+  }
+
+  // Upload / Import handlers
+  public onFileSelected(file: File): void {
+    this.isImporting.set(true);
+    this.fileImported.emit(file);
+    this.showFeedback(`Importing ${file.name}...`);
+
+    // In a real flow, the parent/service completes the import; provide simulated completion feedback
+    setTimeout(() => {
+      this.isImporting.set(false);
+      this.showFeedback(`Activity "${file.name}" imported successfully`);
+    }, 2000);
+  }
 
   // Title edit handlers
   protected startEditingTitle(): void {

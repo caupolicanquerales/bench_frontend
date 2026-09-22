@@ -65,8 +65,15 @@
     </div>
   </div>
 
-  <!-- Right Section: User Profile & Authentication -->
+  <!-- Right Section: Global Actions & User Profile -->
   <div class="user-auth-section">
+    <!-- Global Action: Upload / Import Telemetry File -->
+    <app-upload-button
+      class="header-upload-action"
+      [loading]="isImporting()"
+      (fileSelected)="onFileSelected($event)"
+    />
+
     @if (isSignedIn()) {
       <!-- User Details & Interactive Avatar Toggle -->
       <div class="user-profile-wrapper">

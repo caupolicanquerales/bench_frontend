@@ -1,25 +1,55 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { AppActivityHeader } from './app-activity-header';
 import { AuthService } from '../services/auth-service';
+import { UserProfile } from '../shared/constants/auth-service-constant';
 
 describe('AppActivityHeader', () => {
   let component: AppActivityHeader;
   let fixture: ComponentFixture<AppActivityHeader>;
+  let currentUserSignal = signal<UserProfile | null>(null);
+  let isSignedInSignal = signal(true);
+  let isConnectedSignal = signal(true);
   let mockAuthService: {
     login: () => void;
     register: () => void;
     logout: () => void;
     isLogged: boolean;
     token: string;
+    currentUser: typeof currentUserSignal;
+    isSignedIn: typeof isSignedInSignal;
+    isConnected: typeof isConnectedSignal;
+    userName: () => string;
+    userEmail: () => string;
+    userRole: () => string;
+    avatarUrl: () => string;
   };
 
   beforeEach(async () => {
+    currentUserSignal = signal<UserProfile | null>({
+      id: 'user-1',
+      username: 'matias',
+      fullName: 'Matías Albornoz',
+      email: 'matias@apextelemetry.io',
+      roles: ['ROLE_PRO_ATHLETE'],
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'
+    });
+    isSignedInSignal = signal(true);
+    isConnectedSignal = signal(true);
+
     mockAuthService = {
       login: () => {},
       register: () => {},
       logout: () => {},
-      isLogged: false,
-      token: ''
+      isLogged: true,
+      token: '',
+      currentUser: currentUserSignal,
+      isSignedIn: isSignedInSignal,
+      isConnected: isConnectedSignal,
+      userName: () => 'Matías Albornoz',
+      userEmail: () => 'matias@apextelemetry.io',
+      userRole: () => 'Pro Athlete',
+      avatarUrl: () => 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'
     };
 
     await TestBed.configureTestingModule({
@@ -37,6 +67,34 @@ describe('AppActivityHeader', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  describe('Upload Button Action', () => {
+    it('should render the upload button to the left of the user profile block', () => {
+      const uploadBtn = fixture.nativeElement.querySelector('app-upload-button');
+      const userProfile = fixture.nativeElement.querySelector('.user-profile-wrapper');
+
+      expect(uploadBtn).toBeTruthy();
+      expect(userProfile).toBeTruthy();
+
+      // Ensure upload button comes before the user profile in DOM order
+      expect(uploadBtn.compareDocumentPosition(userProfile) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(uploadBtn.textContent).toContain('Import File');
+    });
+
+    it('should emit fileImported, set loading state and display feedback when a file is selected', () => {
+      let emittedFile: File | null = null;
+      component.fileImported.subscribe((file) => {
+        emittedFile = file;
+      });
+
+      const file = new File(['csv content'], 'session_data.csv', { type: 'text/csv' });
+      component.onFileSelected(file);
+
+      expect(emittedFile).toBe(file);
+      expect(component.isImporting()).toBe(true);
+      expect(component.activeFeedback()).toContain('Importing session_data.csv...');
+    });
   });
 
   describe('User Profile Menu and Non-redundant Identity Header', () => {
@@ -123,6 +181,26 @@ describe('AppActivityHeader', () => {
 
       component.toggleLanguage();
       expect(component.selectedLanguage()).toBe('EN');
+    });
+  });
+
+  describe('Dynamic User Profile from AuthService', () => {
+    it('should reflect user information from AuthService currentUser signal', async () => {
+      currentUserSignal.set({
+        id: 'user-456',
+        username: 'carlos_runner',
+        fullName: 'Carlos Rodriguez',
+        email: 'carlos@running.com',
+        roles: ['ROLE_ELITE_COACH'],
+        avatarUrl: 'https://example.com/carlos.jpg'
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(component.userName()).toBe('Carlos Rodriguez');
+      expect(component.userEmail()).toBe('carlos@running.com');
+      expect(component.userRole()).toBe('Elite Coach');
+      expect(component.userAvatar()).toBe('https://example.com/carlos.jpg');
     });
   });
 

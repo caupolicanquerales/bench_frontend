@@ -1,0 +1,187 @@
+<button
+  type="button"
+  class="upload-btn"
+  [class.loading]="loading()"
+  [disabled]="disabled() || loading()"
+  [attr.aria-label]="loading() ? loadingText() : ariaLabel()"
+  (click)="openModal()"
+>
+  @if (loading()) {
+    <svg class="spinner-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle class="spinner-track" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+      <path class="spinner-head" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+    <span class="upload-btn-label">{{ loadingText() }}</span>
+  } @else {
+    <svg
+      class="upload-icon"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        fill-rule="evenodd"
+        d="M3 14a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm6.293-9.707a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 7.414V12a1 1 0 11-2 0V7.414L7.707 8.707a1 1 0 01-1.414-1.414l3-3z"
+        clip-rule="evenodd"
+      />
+    </svg>
+    <span class="upload-btn-label">{{ label() }}</span>
+  }
+</button>
+
+@if (isModalOpen()) {
+  <div class="modal-backdrop" (click)="closeModal()" role="presentation">
+    <div
+      class="upload-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="upload-modal-title"
+      (click)="$event.stopPropagation()"
+    >
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-title-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fill-rule="evenodd"
+                d="M3 14a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm6.293-9.707a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 7.414V12a1 1 0 11-2 0V7.414L7.707 8.707a1 1 0 01-1.414-1.414l3-3z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </div>
+          <div>
+            <h2 id="upload-modal-title" class="modal-title">Upload Activity Telemetry</h2>
+            <p class="modal-subtitle">Import your workout from Garmin, Strava, or GPS devices</p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          class="modal-close-btn"
+          (click)="closeModal()"
+          [disabled]="loading()"
+          aria-label="Close dialog"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Drag and Drop Zone -->
+      <div
+        class="drop-zone"
+        [class.dragging]="isDragging()"
+        [class.has-file]="!!selectedFile()"
+        [class.has-error]="!!dragError()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+        (click)="triggerFileSelect()"
+        tabindex="0"
+        role="button"
+        aria-label="File drop zone"
+        (keydown.enter)="triggerFileSelect()"
+        (keydown.space)="triggerFileSelect()"
+      >
+        <input
+          #modalFileInput
+          type="file"
+          class="file-input-hidden"
+          [accept]="accept()"
+          (change)="onFileInputChange($event)"
+          tabindex="-1"
+          aria-hidden="true"
+        />
+
+        @if (!selectedFile()) {
+          <div class="drop-zone-content">
+            <div class="drop-icon-wrapper" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
+            <p class="drop-primary-text">
+              <span class="browse-link">Choose a file</span> or drag & drop here
+            </p>
+            <p class="drop-formats-hint">Supported formats: <strong>.FIT</strong>, <strong>.GPX</strong>, <strong>.CSV</strong></p>
+          </div>
+        } @else {
+          <!-- Selected File Preview Badge -->
+          <div class="file-preview-card" (click)="$event.stopPropagation()">
+            <div class="file-icon-box" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div class="file-details">
+              <span class="file-name-meta">
+                <strong class="file-name" [title]="selectedFile()!.name">{{ selectedFile()!.name }}</strong>
+                <span class="meta-separator">·</span>
+                <span class="file-size">{{ formatFileSize(selectedFile()!.size) }}</span>
+              </span>
+              <span class="file-ready-tag">Ready to process</span>
+            </div>
+            @if (!loading()) {
+              <button
+                type="button"
+                class="remove-file-btn"
+                (click)="selectedFile.set(null); dragError.set(null)"
+                title="Remove selected file"
+                aria-label="Remove selected file"
+              >
+                ✕
+              </button>
+            }
+          </div>
+        }
+
+        @if (dragError()) {
+          <div class="drop-error-banner" role="alert" (click)="$event.stopPropagation()">
+            <span class="error-icon" aria-hidden="true">⚠️</span>
+            <div class="error-text-group">
+              <span class="error-msg">{{ dragError() }}</span>
+              <span class="error-prompt">Please select or drop a valid .csv, .fit, or .gpx file to re-upload.</span>
+            </div>
+            <button
+              type="button"
+              class="error-dismiss-btn"
+              (click)="dragError.set(null)"
+              aria-label="Dismiss error"
+            >
+              ✕
+            </button>
+          </div>
+        }
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="modal-footer">
+        <button
+          type="button"
+          class="modal-btn modal-btn-cancel"
+          (click)="closeModal()"
+          [disabled]="loading()"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="modal-btn modal-btn-submit"
+          [class.ready]="!!selectedFile() && !loading()"
+          [disabled]="!selectedFile() || loading()"
+          (click)="confirmUpload()"
+        >
+          @if (loading()) {
+            <svg class="spinner-icon small" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle class="spinner-track" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+              <path class="spinner-head" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Parsing GPS streams...</span>
+          } @else {
+            <span>Import File</span>
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}

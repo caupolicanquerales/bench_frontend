@@ -96,6 +96,9 @@
   font-weight: 500;
 }
 .user-auth-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   flex-shrink: 0;
   position: relative;
   z-index: 1000;
@@ -104,8 +107,6 @@
   display: flex;
   align-items: center;
   gap: .85rem;
-  position: relative;
-  z-index: 1000;
 }
 .user-details-text {
   display: flex;
