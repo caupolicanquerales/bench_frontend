@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, input, output, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, effect, input, output, signal } from '@angular/core';
 
 @Component({
   imports: [],
@@ -14,11 +14,19 @@ export class UploadButton {
   public loading = input<boolean>(false);
   public loadingText = input<string>('Parsing GPS streams...');
   public ariaLabel = input<string>('Import File');
+  public modalOpen = input<boolean>(false);
 
   public fileSelected = output<File>();
+  public modalOpened = output<void>();
+  public modalClosed = output<void>();
 
-  // Modal and drag-and-drop state
   public isModalOpen = signal(false);
+
+  constructor() {
+    effect(() => {
+      this.isModalOpen.set(this.modalOpen());
+    });
+  }
   public isDragging = signal(false);
   public selectedFile = signal<File | null>(null);
   public dragError = signal<string | null>(null);
@@ -32,6 +40,7 @@ export class UploadButton {
     this.selectedFile.set(null);
     this.dragError.set(null);
     this.isModalOpen.set(true);
+    this.modalOpened.emit();
   }
 
   public closeModal(): void {
@@ -42,6 +51,7 @@ export class UploadButton {
     this.isDragging.set(false);
     this.selectedFile.set(null);
     this.dragError.set(null);
+    this.modalClosed.emit();
   }
 
   public triggerFileSelect(): void {

@@ -1,7 +1,11 @@
 import { Component, HostListener, effect, output, signal } from '@angular/core';
+import { SseEndpointService } from '../services/sse-endpoint-service';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../services/auth-service';
 import { UploadButton } from '../shared/components/upload-button/upload-button';
+import { convertFileToFormData } from '../utils/file.util';
+import { Subject, Subscription } from 'rxjs';
+import { OnDestroy } from '@angular/core';
 
 @Component({
   imports: [FormsModule, UploadButton],
@@ -10,7 +14,7 @@ import { UploadButton } from '../shared/components/upload-button/upload-button';
   styleUrl: './app-activity-header.scss',
   templateUrl: './app-activity-header.html',
 })
-export class AppActivityHeader {
+export class AppActivityHeader implements OnDestroy {
   // Activity identity state
   public activityTitle = signal('Ciudad de Buenos Aires Carrera');
   public isEditingTitle = signal(false);
@@ -18,8 +22,9 @@ export class AppActivityHeader {
   public activitySubtitle = signal('Running • Sunday Morning Session');
 
   // File import action
-  public fileImported = output<File>();
+  public fileImported = output<FormData>();
   public isImporting = signal(false);
+  public isUploadModalOpen = signal(false);
 
   // Authentication & User Profile state (bound to AuthService)
   public isSignedIn = signal<boolean>(true);
@@ -46,7 +51,11 @@ export class AppActivityHeader {
   public selectedLanguage = signal<'EN' | 'ES'>('EN');
   public activeFeedback = signal<string | null>(null);
 
-  constructor(private authService: AuthService) {
+  subscriptions: Subscription = new Subscription();
+  private destroy$ = new Subject<void>();
+
+
+  constructor(private authService: AuthService, private sseEndpointService: SseEndpointService) {
     if (typeof this.authService.currentUser === 'function') {
       effect(() => {
         const user = this.authService.currentUser();
@@ -82,18 +91,18 @@ export class AppActivityHeader {
       });
     }
   }
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 
   // Upload / Import handlers
   public onFileSelected(file: File): void {
     this.isImporting.set(true);
-    this.fileImported.emit(file);
+    const formData = convertFileToFormData(file);
     this.showFeedback(`Importing ${file.name}...`);
-
-    // In a real flow, the parent/service completes the import; provide simulated completion feedback
-    setTimeout(() => {
-      this.isImporting.set(false);
-      this.showFeedback(`Activity "${file.name}" imported successfully`);
-    }, 2000);
+    this.setSubscriptionToFileReceiver(true, formData);
   }
 
   // Title edit handlers
@@ -214,6 +223,29 @@ export class AppActivityHeader {
   public onDocumentClick(): void {
     if (this.isProfileMenuOpen()) {
       this.closeProfileMenu();
+    }
+  }
+
+  public closeUploadModal(): void {
+    this.isUploadModalOpen.set(false);
+  }
+
+  private setSubscriptionToFileReceiver(executing: boolean, formData: FormData): void{
+    if(executing){
+      this.subscriptions.add(
+        this.sseEndpointService.saveRawFile(formData).subscribe({
+          next: (response) => {
+            this.isImporting.set(false);
+            this.isUploadModalOpen.set(false);
+            this.showFeedback(`Activity imported successfully`);
+          },
+          error: (err) =>{
+            this.isImporting.set(false);
+            this.isUploadModalOpen.set(false);
+            this.showFeedback(`Failed to import activity`);
+          },
+        })
+      );
     }
   }
 }

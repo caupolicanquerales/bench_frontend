@@ -147,9 +147,27 @@ export class AuthService {
     }
 
     get token(): string {
-        return isPlatformBrowser(this.platformId) ? this.oauthService.getAccessToken() : '';
+        if (!isPlatformBrowser(this.platformId)) {
+            return '';
+        }
+        try {
+            const token = this.oauthService.getAccessToken();
+            if (token) return token;
+        } catch {}
+
+        try {
+            const sessionToken = sessionStorage.getItem('access_token') || sessionStorage.getItem('token');
+            if (sessionToken) return sessionToken;
+        } catch {}
+
+        try {
+            const localToken = localStorage.getItem('access_token') || localStorage.getItem('token');
+            if (localToken) return localToken;
+        } catch {}
+
+        return '';
     }
-    
+
     hasValidAccessToken(): boolean {
         return isPlatformBrowser(this.platformId) && this.oauthService.hasValidAccessToken();
     }

@@ -71,6 +71,9 @@
     <app-upload-button
       class="header-upload-action"
       [loading]="isImporting()"
+      [modalOpen]="isUploadModalOpen()"
+      (modalOpened)="isUploadModalOpen.set(true)"
+      (modalClosed)="closeUploadModal()"
       (fileSelected)="onFileSelected($event)"
     />
 
