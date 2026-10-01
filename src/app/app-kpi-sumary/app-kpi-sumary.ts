@@ -1,4 +1,7 @@
-import { Component, output, signal } from '@angular/core';
+import { Component, output, signal, OnInit, OnDestroy } from '@angular/core';
+import { GeneralService } from '../services/general.service';
+import { SseEndpointService } from '../services/sse-endpoint-service';
+import { Subject, Subscription, takeUntil } from 'rxjs';
 
 export interface KpiMetric {
   id: string;
@@ -22,11 +25,13 @@ export interface KpiMetric {
   styleUrl: './app-kpi-sumary.scss',
   templateUrl: './app-kpi-sumary.html',
 })
-export class AppKpiSumary {
+export class AppKpiSumary implements OnInit, OnDestroy {
   public readonly metricSelected = output<string>();
 
   protected selectedMetricId = signal<string>('distance');
   protected hoveredMetricId = signal<string | null>(null);
+  subscriptions: Subscription = new Subscription();
+  private destroy$ = new Subject<void>();
 
   protected metrics = signal<KpiMetric[]>([
     {
@@ -97,6 +102,19 @@ export class AppKpiSumary {
     },
   ]);
 
+  constructor(private generalService: GeneralService,
+      private sseEndpointService: SseEndpointService) {}
+
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  ngOnInit(): void {
+      this.generalService.summaryData$.pipe(takeUntil(this.destroy$)).subscribe((summaryData) => this.setSubscriptionToSummaryData(summaryData));
+  }
+
   protected selectMetric(id: string): void {
     this.selectedMetricId.set(id);
     this.metricSelected.emit(id);
@@ -104,5 +122,20 @@ export class AppKpiSumary {
 
   protected setHoveredMetric(id: string | null): void {
     this.hoveredMetricId.set(id);
+  }
+
+  private setSubscriptionToSummaryData(summaryData: boolean): void{
+    if(summaryData){
+      this.subscriptions.add(
+        this.sseEndpointService.getSummaryData().subscribe({
+          next: (response) => {
+            console.log('Summary Data received:', response);
+          },
+          error: (err) =>{
+            console.log('Summary Data error:', err);
+          },
+        })
+      );
+    }
   }
 }

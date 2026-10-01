@@ -6,6 +6,7 @@ import { UploadButton } from '../shared/components/upload-button/upload-button';
 import { convertFileToFormData } from '../utils/file.util';
 import { Subject, Subscription } from 'rxjs';
 import { OnDestroy } from '@angular/core';
+import { GeneralService } from '../services/general.service';
 
 @Component({
   imports: [FormsModule, UploadButton],
@@ -55,7 +56,10 @@ export class AppActivityHeader implements OnDestroy {
   private destroy$ = new Subject<void>();
 
 
-  constructor(private authService: AuthService, private sseEndpointService: SseEndpointService) {
+  constructor(private authService: AuthService,
+    private sseEndpointService: SseEndpointService,
+    private generalService: GeneralService) {
+
     if (typeof this.authService.currentUser === 'function') {
       effect(() => {
         const user = this.authService.currentUser();
@@ -100,6 +104,9 @@ export class AppActivityHeader implements OnDestroy {
   // Upload / Import handlers
   public onFileSelected(file: File): void {
     this.isImporting.set(true);
+    this.generalService.setSummaryData(false);
+    this.generalService.setChartsData(false);
+    this.generalService.setGpsData(false);
     const formData = convertFileToFormData(file);
     this.showFeedback(`Importing ${file.name}...`);
     this.setSubscriptionToFileReceiver(true, formData);
@@ -237,6 +244,9 @@ export class AppActivityHeader implements OnDestroy {
           next: (response) => {
             this.isImporting.set(false);
             this.isUploadModalOpen.set(false);
+            this.generalService.setSummaryData(true);
+            this.generalService.setChartsData(true);
+            this.generalService.setGpsData(true);
             this.showFeedback(`Activity imported successfully`);
           },
           error: (err) =>{

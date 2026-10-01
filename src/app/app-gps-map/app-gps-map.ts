@@ -6,10 +6,14 @@ import {
   ElementRef,
   inject,
   OnDestroy,
+  OnInit,
   PLATFORM_ID,
   signal,
   ViewChild,
 } from '@angular/core';
+import { GeneralService } from '../services/general.service';
+import { SseEndpointService } from '../services/sse-endpoint-service';
+import { Subject, Subscription, takeUntil } from 'rxjs';
 
 export type MapLayerType = 'streets' | 'satellite' | 'dark' | 'terrain';
 
@@ -30,7 +34,7 @@ export interface MapLayerConfig {
   styleUrl: './app-gps-map.scss',
   templateUrl: './app-gps-map.html',
 })
-export class AppGpsMap implements OnDestroy {
+export class AppGpsMap implements OnInit, OnDestroy {
   @ViewChild('mapCanvas') mapContainer!: ElementRef<HTMLDivElement>;
 
   private readonly platformId = inject(PLATFORM_ID);
@@ -55,6 +59,8 @@ export class AppGpsMap implements OnDestroy {
   private overlayGroup: any = null;
   private L: any = null;
   private resizeObserver: ResizeObserver | null = null;
+  subscriptions: Subscription = new Subscription();
+  private destroy$ = new Subject<void>();
 
   // Sample GPS Track with latitude, longitude, and speed (km/h) for hotline
   private readonly gpsTrackPoints: [number, number, number][] = [
@@ -78,7 +84,9 @@ export class AppGpsMap implements OnDestroy {
     [40.4420, -3.6690, 10.8],
   ];
 
-  constructor() {
+  constructor(private generalService: GeneralService,
+    private sseEndpointService: SseEndpointService
+  ) {
     // Executes strictly on the client browser after initial render
     afterNextRender(async () => {
       if (!isPlatformBrowser(this.platformId)) {
@@ -177,6 +185,9 @@ export class AppGpsMap implements OnDestroy {
       }
     });
   }
+  ngOnInit(): void {
+    this.generalService.gpsData$.pipe(takeUntil(this.destroy$)).subscribe((gpsData) => this.setSubscriptionToGpsData(gpsData));
+  }
 
   public ngOnDestroy(): void {
     if (this.resizeObserver) {
@@ -187,6 +198,9 @@ export class AppGpsMap implements OnDestroy {
       this.mapInstance.remove();
       this.mapInstance = null;
     }
+    this.subscriptions.unsubscribe();
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   /**
@@ -337,6 +351,21 @@ export class AppGpsMap implements OnDestroy {
       if (this.isHotlineVisible()) {
         this.hotlineLayer.addTo(this.mapInstance);
       }
+    }
+  }
+
+  private setSubscriptionToGpsData(executing: boolean): void{
+    if(executing){
+      this.subscriptions.add(
+        this.sseEndpointService.getGpsData().subscribe({
+          next: (response) => {
+            console.log('GPS Data received:', response);
+          },
+          error: (err) =>{
+            console.log('GPS Data error:', err);
+          },
+        })
+      );
     }
   }
 }
