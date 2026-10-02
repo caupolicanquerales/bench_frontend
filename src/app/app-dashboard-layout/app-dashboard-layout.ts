@@ -5,6 +5,7 @@ import { AppKpiSumary } from '../app-kpi-sumary/app-kpi-sumary';
 import { AppTelemetryChart } from '../app-telemetry-chart/app-telemetry-chart';
 import { AppActivityHeader } from '../app-activity-header/app-activity-header';
 import { AppSidebarNav } from '../app-sidebar-nav/app-sidebar-nav';
+import { GeneralService } from '../services/general.service';
 
 interface ActivityComment {
   id: number;
@@ -31,26 +32,22 @@ interface ActivityComment {
 export class AppDashboardLayout {
   protected isMobileNavOpen = signal(false);
   protected isContextualDrawerOpen = signal(false);
+  protected hasLoadedActivity = signal(false);
 
-  protected activityNotes = signal('Solid endurance workout across standard terrain. Maintained an even cadence through rolling elevations.');
+  protected activityNotes = signal('');
   protected newCommentText = signal('');
 
-  protected comments = signal<ActivityComment[]>([
-    {
-      id: 1,
-      author: 'Alex Morgan',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-      timeAgo: '2h ago',
-      text: 'Great pace on that steep climb! Keep it up!'
-    },
-    {
-      id: 2,
-      author: 'David Chen',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-      timeAgo: '4h ago',
-      text: 'Solid split times throughout the course.'
-    }
-  ]);
+  protected comments = signal<ActivityComment[]>([]);
+
+  constructor(private generalService: GeneralService) {
+    this.generalService.summaryData$.subscribe((isLoaded) => {
+      this.hasLoadedActivity.set(isLoaded);
+      if (!isLoaded) {
+        this.activityNotes.set('');
+        this.comments.set([]);
+      }
+    });
+  }
 
   protected addComment(): void {
     const text = this.newCommentText().trim();

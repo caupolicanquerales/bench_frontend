@@ -17,10 +17,11 @@ import { GeneralService } from '../services/general.service';
 })
 export class AppActivityHeader implements OnDestroy {
   // Activity identity state
-  public activityTitle = signal('Ciudad de Buenos Aires Carrera');
+  public activityTitle = signal('Overview');
   public isEditingTitle = signal(false);
   public editTitleDraft = signal('');
-  public activitySubtitle = signal('Running • Sunday Morning Session');
+  public activitySubtitle = signal('No activity selected');
+  public hasActiveActivity = signal(false);
 
   // File import action
   public fileImported = output<FormData>();
@@ -59,6 +60,10 @@ export class AppActivityHeader implements OnDestroy {
   constructor(private authService: AuthService,
     private sseEndpointService: SseEndpointService,
     private generalService: GeneralService) {
+
+    this.generalService.summaryData$.subscribe((value) => this.syncActivityState(value));
+    this.generalService.chartsData$.subscribe((value) => this.syncActivityState(value));
+    this.generalService.gpsData$.subscribe((value) => this.syncActivityState(value));
 
     if (typeof this.authService.currentUser === 'function') {
       effect(() => {
@@ -101,12 +106,21 @@ export class AppActivityHeader implements OnDestroy {
     this.destroy$.complete();
   }
 
+  private syncActivityState(active: boolean): void {
+    this.hasActiveActivity.set(active);
+    if (!active) {
+      this.activityTitle.set('Overview');
+      this.activitySubtitle.set('No activity selected');
+    }
+  }
+
   // Upload / Import handlers
   public onFileSelected(file: File): void {
     this.isImporting.set(true);
     this.generalService.setSummaryData(false);
     this.generalService.setChartsData(false);
     this.generalService.setGpsData(false);
+    this.syncActivityState(false);
     const formData = convertFileToFormData(file);
     this.showFeedback(`Importing ${file.name}...`);
     this.setSubscriptionToFileReceiver(true, formData);
@@ -244,9 +258,12 @@ export class AppActivityHeader implements OnDestroy {
           next: (response) => {
             this.isImporting.set(false);
             this.isUploadModalOpen.set(false);
+            this.hasActiveActivity.set(true);
             this.generalService.setSummaryData(true);
             this.generalService.setChartsData(true);
             this.generalService.setGpsData(true);
+            this.activityTitle.set('Activity Overview');
+            this.activitySubtitle.set('Live telemetry session');
             this.showFeedback(`Activity imported successfully`);
           },
           error: (err) =>{

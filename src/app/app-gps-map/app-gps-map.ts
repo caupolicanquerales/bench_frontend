@@ -14,6 +14,8 @@ import {
 import { GeneralService } from '../services/general.service';
 import { SseEndpointService } from '../services/sse-endpoint-service';
 import { Subject, Subscription, takeUntil } from 'rxjs';
+import { GarminGpsModel } from '../models/garmin-gps.model';
+import { convertFileToFormData } from '../utils/file.util';
 
 export type MapLayerType = 'streets' | 'satellite' | 'dark' | 'terrain';
 
@@ -41,13 +43,15 @@ export class AppGpsMap implements OnInit, OnDestroy {
 
   // Component Signals and State
   protected isBrowser = true;
+  protected hasTrackData = signal<boolean>(false);
+  protected isDropTarget = signal<boolean>(false);
   protected activeLayer = signal<MapLayerType>('streets');
   protected isHotlineVisible = signal<boolean>(true);
-  protected currentSpeedMetric = signal<string>('Avg: 12.4 km/h');
+  protected currentSpeedMetric = signal<string>('--');
   protected weatherInfo = signal<{ temp: string; condition: string; wind: string }>({
-    temp: '18°C',
-    condition: 'Partly Cloudy',
-    wind: '12 km/h NW',
+    temp: '--',
+    condition: 'No activity loaded',
+    wind: '--',
   });
 
   // Reliable production-grade tile servers (OSM, CartoDB & Esri World Imagery)
@@ -58,131 +62,20 @@ export class AppGpsMap implements OnInit, OnDestroy {
   private hotlineLayer: any = null;
   private overlayGroup: any = null;
   private L: any = null;
+  private fileInputEl: HTMLInputElement | null = null;
   private resizeObserver: ResizeObserver | null = null;
   subscriptions: Subscription = new Subscription();
   private destroy$ = new Subject<void>();
 
   // Sample GPS Track with latitude, longitude, and speed (km/h) for hotline
-  private readonly gpsTrackPoints: [number, number, number][] = [
-    [40.4150, -3.7080, 8.5],
-    [40.4162, -3.7055, 9.8],
-    [40.4175, -3.7030, 11.2],
-    [40.4190, -3.7010, 12.6],
-    [40.4205, -3.6990, 13.8],
-    [40.4220, -3.6975, 14.5],
-    [40.4245, -3.6960, 15.2],
-    [40.4270, -3.6945, 14.1],
-    [40.4290, -3.6930, 12.3],
-    [40.4310, -3.6910, 10.5],
-    [40.4325, -3.6890, 9.2],
-    [40.4340, -3.6865, 11.0],
-    [40.4352, -3.6840, 13.1],
-    [40.4365, -3.6810, 14.9],
-    [40.4380, -3.6780, 16.0],
-    [40.4395, -3.6750, 14.8],
-    [40.4410, -3.6720, 12.5],
-    [40.4420, -3.6690, 10.8],
-  ];
+  private gpsTrackPoints: [number, number, number][] = [];
 
   constructor(private generalService: GeneralService,
     private sseEndpointService: SseEndpointService
   ) {
     // Executes strictly on the client browser after initial render
     afterNextRender(async () => {
-      if (!isPlatformBrowser(this.platformId)) {
-        return;
-      }
-
-      // 1. Resolve Leaflet: Prefer global L (from scripts bundle) to avoid ESM closure scope issues,
-      // fallback to dynamic import/require if not yet available
-      let L = typeof window !== 'undefined' ? (window as any).L : null;
-
-      if (!L) {
-        try {
-          const leafletMod: any = await import('leaflet');
-          L = leafletMod.default?.map
-            ? leafletMod.default
-            : (leafletMod.map ? leafletMod : (leafletMod.default ?? leafletMod));
-        } catch {
-          // If commonjs require is available in bundler context
-          if (typeof (window as any).require === 'function') {
-            L = (window as any).require('leaflet');
-          }
-        }
-      }
-
-      // Expose L globally so plugins can bind to it
-      if (typeof window !== 'undefined') {
-        (window as any).L = L;
-      }
-
-      // 2. Resolve leaflet-hotline plugin: ensure L.hotline is bound
-      if (L && !L.hotline) {
-        try {
-          const hotlineModule: any = await import('leaflet-hotline');
-          const hotlineFn = typeof hotlineModule === 'function'
-            ? hotlineModule
-            : (hotlineModule?.default ?? hotlineModule);
-
-          if (typeof hotlineFn === 'function') {
-            hotlineFn(L);
-          }
-        } catch (err) {
-          console.warn('Failed to load leaflet-hotline dynamically:', err);
-        }
-      }
-
-      this.L = L;
-
-      // 3. Initialize Map manually
-      if (this.mapContainer?.nativeElement && L?.map) {
-        this.mapInstance = L.map(this.mapContainer.nativeElement, {
-          zoomControl: false,
-          attributionControl: false,
-        }).setView([40.4168, -3.7038], 13);
-
-        L.control.zoom({ position: 'bottomright' }).addTo(this.mapInstance);
-
-        // Apply initial tile layer
-        this.applyTileLayer(this.activeLayer());
-
-        // Telemetry overlay group
-        this.overlayGroup = L.layerGroup().addTo(this.mapInstance);
-
-        // Build Hotline & Start/Finish markers
-        this.buildHotlineLayer(L);
-
-        // Fit map bounds to GPS track
-        const bounds = L.latLngBounds(
-          this.gpsTrackPoints.map(([lat, lng]) => [lat, lng] as [number, number]),
-        );
-        this.mapInstance.fitBounds(bounds, { padding: [40, 40] });
-
-        // Force canvas re-render and trigger size recalculations once layout settles
-        setTimeout(() => {
-          if (this.mapInstance) {
-            this.mapInstance.invalidateSize({ animate: false });
-          }
-        }, 300);
-
-        [100, 250, 500].forEach((delay) => {
-          setTimeout(() => {
-            if (this.mapInstance) {
-              this.mapInstance.invalidateSize();
-            }
-          }, delay);
-        });
-
-        // Continuously adapt when container size changes
-        if (typeof ResizeObserver !== 'undefined') {
-          this.resizeObserver = new ResizeObserver(() => {
-            if (this.mapInstance) {
-              this.mapInstance.invalidateSize();
-            }
-          });
-          this.resizeObserver.observe(this.mapContainer.nativeElement);
-        }
-      }
+      await this.initMapIfNeeded();
     });
   }
   ngOnInit(): void {
@@ -201,6 +94,135 @@ export class AppGpsMap implements OnInit, OnDestroy {
     this.subscriptions.unsubscribe();
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  private async resolveLeaflet(): Promise<any> {
+    if (this.L) {
+      return this.L;
+    }
+
+    let L = typeof window !== 'undefined' ? (window as any).L : null;
+
+    if (!L) {
+      try {
+        const leafletMod: any = await import('leaflet');
+        L = leafletMod.default?.map
+          ? leafletMod.default
+          : (leafletMod.map ? leafletMod : (leafletMod.default ?? leafletMod));
+      } catch {
+        if (typeof (window as any).require === 'function') {
+          L = (window as any).require('leaflet');
+        }
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      (window as any).L = L;
+    }
+
+    if (L && !L.hotline) {
+      try {
+        const hotlineModule: any = await import('leaflet-hotline');
+        const hotlineFn = typeof hotlineModule === 'function'
+          ? hotlineModule
+          : (hotlineModule?.default ?? hotlineModule);
+
+        if (typeof hotlineFn === 'function') {
+          hotlineFn(L);
+        }
+      } catch (err) {
+        console.warn('Failed to load leaflet-hotline dynamically:', err);
+      }
+    }
+
+    this.L = L;
+    return L;
+  }
+
+  private async initMapIfNeeded(): Promise<boolean> {
+    if (!isPlatformBrowser(this.platformId)) {
+      return false;
+    }
+
+    if (this.mapInstance) {
+      return true;
+    }
+
+    if (!this.mapContainer?.nativeElement) {
+      return false;
+    }
+
+    const L = await this.resolveLeaflet();
+
+    if (this.mapContainer?.nativeElement && L?.map && !this.mapInstance) {
+      this.mapInstance = L.map(this.mapContainer.nativeElement, {
+        zoomControl: false,
+        attributionControl: false,
+      });
+
+      this.applyInitialMapCenter();
+
+      L.control.zoom({ position: 'bottomright' }).addTo(this.mapInstance);
+
+      // Apply initial tile layer
+      this.applyTileLayer(this.activeLayer());
+
+      // Telemetry overlay group
+      this.overlayGroup = L.layerGroup().addTo(this.mapInstance);
+
+      // If we already have track data, build the visualization
+      if (this.gpsTrackPoints.length > 0) {
+        this.refreshTrackVisualization();
+      }
+
+      // Continuously adapt when container size changes
+      if (typeof ResizeObserver !== 'undefined' && !this.resizeObserver) {
+        this.resizeObserver = new ResizeObserver(() => {
+          if (this.mapInstance) {
+            this.mapInstance.invalidateSize();
+          }
+        });
+        this.resizeObserver.observe(this.mapContainer.nativeElement);
+      }
+
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Set the initial map center using browser geolocation when available.
+   * Falls back to Madrid only when location access is denied or unavailable.
+   */
+  private applyInitialMapCenter(): void {
+    if (!this.mapInstance || !this.L) {
+      return;
+    }
+
+    const madridFallback: [number, number] = [40.4168, -3.7038];
+
+    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          this.mapInstance.setView(
+            [position.coords.latitude, position.coords.longitude],
+            12,
+          );
+        },
+        () => {
+          this.mapInstance.setView(madridFallback, 13);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 8000,
+          maximumAge: 300000,
+        },
+      );
+      return;
+    }
+
+    this.mapInstance.setView(madridFallback, 13);
   }
 
   /**
@@ -302,12 +324,33 @@ export class AppGpsMap implements OnInit, OnDestroy {
     }
   }
 
-  private buildHotlineLayer(L: any): void {
-    if (!this.mapInstance) {
+  private refreshTrackVisualization(): void {
+    if (!this.mapInstance || !this.L || this.gpsTrackPoints.length === 0) {
       return;
     }
 
-    // Start and Finish Markers
+    if (this.hotlineLayer) {
+      this.mapInstance.removeLayer(this.hotlineLayer);
+      this.hotlineLayer = null;
+    }
+
+    if (this.overlayGroup) {
+      this.overlayGroup.clearLayers();
+    }
+
+    this.buildHotlineLayer(this.L);
+
+    const bounds = this.L.latLngBounds(
+      this.gpsTrackPoints.map(([lat, lng]) => [lat, lng] as [number, number]),
+    );
+    this.mapInstance.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+  }
+
+  private buildHotlineLayer(L: any): void {
+    if (!this.mapInstance || this.gpsTrackPoints.length === 0) {
+      return;
+    }
+
     const startPoint = this.gpsTrackPoints[0];
     const finishPoint = this.gpsTrackPoints[this.gpsTrackPoints.length - 1];
 
@@ -330,18 +373,17 @@ export class AppGpsMap implements OnInit, OnDestroy {
       .addTo(this.overlayGroup ?? this.mapInstance);
 
     L.marker([finishPoint[0], finishPoint[1]], { icon: finishIcon })
-      .bindTooltip('Finish (21.3 km)', { permanent: false, direction: 'top' })
+      .bindTooltip('Finish', { permanent: false, direction: 'top' })
       .addTo(this.overlayGroup ?? this.mapInstance);
 
-    // Leaflet.hotline speed gradient
     if (typeof L.hotline === 'function') {
       this.hotlineLayer = L.hotline(this.gpsTrackPoints, {
         min: 8,
         max: 16,
         palette: {
-          0.0: '#10b981', // green
-          0.5: '#f59e0b', // amber
-          1.0: '#ef4444', // red
+          0.0: '#10b981',
+          0.5: '#f59e0b',
+          1.0: '#ef4444',
         },
         weight: 6,
         outlineColor: '#0f172a',
@@ -351,22 +393,167 @@ export class AppGpsMap implements OnInit, OnDestroy {
       if (this.isHotlineVisible()) {
         this.hotlineLayer.addTo(this.mapInstance);
       }
+    } else {
+      const latLngs = this.gpsTrackPoints.map(([lat, lng]) => [lat, lng] as [number, number]);
+      this.hotlineLayer = L.polyline(latLngs, {
+        color: '#3b82f6',
+        weight: 5,
+        opacity: 0.9,
+      });
+      if (this.isHotlineVisible()) {
+        this.hotlineLayer.addTo(this.mapInstance);
+      }
     }
   }
 
-  private setSubscriptionToGpsData(executing: boolean): void{
-    if(executing){
-      this.subscriptions.add(
-        this.sseEndpointService.getGpsData().subscribe({
-          next: (response) => {
-            console.log('GPS Data received:', response);
-          },
-          error: (err) =>{
-            console.log('GPS Data error:', err);
-          },
-        })
-      );
+  protected triggerEmptyStateUpload(): void {
+    if (!this.fileInputEl) {
+      this.fileInputEl = document.createElement('input');
+      this.fileInputEl.type = 'file';
+      this.fileInputEl.accept = '.csv,.fit,.gpx,.tcx';
+      this.fileInputEl.style.display = 'none';
+      this.fileInputEl.addEventListener('change', (event: Event) => {
+        const target = event.target as HTMLInputElement;
+        const file = target.files?.[0];
+        if (file) {
+          this.uploadActivityFile(file);
+        }
+        target.value = '';
+      });
+      document.body.appendChild(this.fileInputEl);
     }
+
+    this.fileInputEl.click();
+  }
+
+  protected onEmptyStateDragOver(event: DragEvent): void {
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+    this.isDropTarget.set(true);
+  }
+
+  protected onEmptyStateDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    this.isDropTarget.set(false);
+  }
+
+  protected onEmptyStateDrop(event: DragEvent): void {
+    event.preventDefault();
+    this.isDropTarget.set(false);
+
+    const file = event.dataTransfer && event.dataTransfer.files.length > 0
+      ? event.dataTransfer.files[0]
+      : null;
+    if (file) {
+      this.uploadActivityFile(file);
+    }
+  }
+
+  private uploadActivityFile(file: File): void {
+    this.hasTrackData.set(false);
+    this.generalService.setSummaryData(false);
+    this.generalService.setChartsData(false);
+    this.generalService.setGpsData(false);
+
+    const formData = convertFileToFormData(file);
+
+    this.subscriptions.add(
+      this.sseEndpointService.saveRawFile(formData).subscribe({
+        next: () => {
+          this.generalService.setSummaryData(true);
+          this.generalService.setChartsData(true);
+          this.generalService.setGpsData(true);
+        },
+        error: () => {
+          this.generalService.setSummaryData(false);
+          this.generalService.setChartsData(false);
+          this.generalService.setGpsData(false);
+        },
+      })
+    );
+  }
+
+  private setSubscriptionToGpsData(executing: boolean): void {
+    if (!executing) {
+      this.hasTrackData.set(false);
+      this.gpsTrackPoints = [];
+      this.currentSpeedMetric.set('--');
+      this.weatherInfo.set({
+        temp: '--',
+        condition: 'No activity loaded',
+        wind: '--',
+      });
+      if (this.hotlineLayer && this.mapInstance) {
+        this.mapInstance.removeLayer(this.hotlineLayer);
+        this.hotlineLayer = null;
+      }
+      if (this.overlayGroup) {
+        this.overlayGroup.clearLayers();
+      }
+      return;
+    }
+
+    this.subscriptions.add(
+      this.sseEndpointService.getGpsData().subscribe({
+        next: async (response) => {
+          const track = Array.isArray(response?.data)
+            ? response.data
+            : [];
+
+          this.hasTrackData.set(track.length > 0);
+          this.gpsTrackPoints = track.map((point: GarminGpsModel) => [
+            Number(point.latitude),
+            Number(point.longitude),
+            Number(point.speedKmH),
+          ] as [number, number, number]);
+
+          if (this.gpsTrackPoints.length > 0) {
+            const avgSpeed = (
+              this.gpsTrackPoints.reduce((sum, [, , speed]) => sum + speed, 0) /
+              this.gpsTrackPoints.length
+            ).toFixed(1);
+            this.currentSpeedMetric.set(`Avg: ${avgSpeed} km/h`);
+            this.weatherInfo.set({
+              temp: '18°C',
+              condition: 'Partly Cloudy',
+              wind: '12 km/h NW',
+            });
+
+            await this.initMapIfNeeded();
+            [50, 150, 300, 600].forEach((delay) => {
+              setTimeout(() => {
+                if (this.mapInstance) {
+                  this.mapInstance.invalidateSize({ animate: false });
+                  this.refreshTrackVisualization();
+                }
+              }, delay);
+            });
+          } else {
+            this.currentSpeedMetric.set('--');
+            this.weatherInfo.set({
+              temp: '--',
+              condition: 'No activity loaded',
+              wind: '--',
+            });
+          }
+
+          console.log('GPS Data received:', this.gpsTrackPoints.length, 'points');
+        },
+        error: (err) => {
+          this.hasTrackData.set(false);
+          this.gpsTrackPoints = [];
+          this.currentSpeedMetric.set('--');
+          this.weatherInfo.set({
+            temp: '--',
+            condition: 'No activity loaded',
+            wind: '--',
+          });
+          console.log('GPS Data error:', err);
+        },
+      })
+    );
   }
 }
 

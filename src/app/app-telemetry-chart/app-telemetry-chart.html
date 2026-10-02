@@ -1,1 +1,61 @@
-<p>app-telemetry-chart works!</p>
+<section class="telemetry-chart-panel" aria-label="Telemetry chart panel">
+  @if (hasTelemetryData() && sharedHud(); as hud) {
+    <div class="telemetry-crosshair-hud" aria-live="polite">
+      <div class="telemetry-hud-row telemetry-hud-header">
+        <span class="telemetry-hud-label">Time</span>
+        <span class="telemetry-hud-value">{{ hud.time }}</span>
+      </div>
+      <div class="telemetry-hud-row">
+        <span class="telemetry-hud-label">Power</span>
+        <span class="telemetry-hud-value">{{ hud.power }}</span>
+      </div>
+      <div class="telemetry-hud-row">
+        <span class="telemetry-hud-label">HR</span>
+        <span class="telemetry-hud-value">{{ hud.heartRate }}</span>
+      </div>
+      <div class="telemetry-hud-row">
+        <span class="telemetry-hud-label">Cadence</span>
+        <span class="telemetry-hud-value">{{ hud.cadence }}</span>
+      </div>
+    </div>
+  }
+
+  @if (hasTelemetryData()) {
+    <div class="telemetry-chart-grid">
+      @for (chart of telemetryCharts; track chart.key) {
+        <div class="telemetry-chart-card" [attr.data-metric]="chart.key">
+          <div class="telemetry-chart-header">
+            <span class="telemetry-chart-title">{{ chart.title }}</span>
+            <div class="telemetry-chart-metrics">
+              @if (chart.key === 'power') {
+                <span class="telemetry-chart-metric"><span class="label">Avg</span> <span class="value">342 W</span></span>
+                <span class="telemetry-chart-metric"><span class="label">GAP</span> <span class="value">351 W</span></span>
+                <span class="telemetry-chart-metric"><span class="label">Max</span> <span class="value">380 W</span></span>
+              } @else if (chart.key === 'heartRate') {
+                <span class="telemetry-chart-metric"><span class="label">Avg</span> <span class="value">121 bpm</span></span>
+                <span class="telemetry-chart-metric"><span class="label">Max</span> <span class="value">134 bpm</span></span>
+              } @else if (chart.key === 'cadence') {
+                <span class="telemetry-chart-metric"><span class="label">Avg</span> <span class="value">85 rpm</span></span>
+                <span class="telemetry-chart-metric"><span class="label">Max</span> <span class="value">88 rpm</span></span>
+              } @else {
+                <span class="telemetry-chart-metric"><span class="label">Avg</span> <span class="value">12.4 km/h</span></span>
+                <span class="telemetry-chart-metric"><span class="label">Max</span> <span class="value">16.8 km/h</span></span>
+              }
+            </div>
+          </div>
+
+          <div
+            echarts
+            [options]="chart.option()"
+            class="telemetry-chart"
+            role="img"
+            [attr.aria-label]="chart.ariaLabel"
+            (chartInit)="onChartInit($event, chart.key)"
+            (chartMouseMove)="onChartMouseMove(chart.key, $event)"
+            (chartMouseLeave)="onChartMouseLeave()"
+          ></div>
+        </div>
+      }
+    </div>
+  }
+</section>

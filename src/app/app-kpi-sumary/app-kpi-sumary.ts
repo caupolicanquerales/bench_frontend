@@ -2,6 +2,8 @@ import { Component, output, signal, OnInit, OnDestroy } from '@angular/core';
 import { GeneralService } from '../services/general.service';
 import { SseEndpointService } from '../services/sse-endpoint-service';
 import { Subject, Subscription, takeUntil } from 'rxjs';
+import { GarminSummaryModel } from '../models/garmin-summary.model';
+import { kpiSummaryMetricConfig } from '../shared/constants/app-kpi-summary-constant';
 
 export interface KpiMetric {
   id: string;
@@ -28,79 +30,12 @@ export interface KpiMetric {
 export class AppKpiSumary implements OnInit, OnDestroy {
   public readonly metricSelected = output<string>();
 
-  protected selectedMetricId = signal<string>('distance');
+  protected selectedMetricId = signal<string>('totalDistanceM');
   protected hoveredMetricId = signal<string | null>(null);
   subscriptions: Subscription = new Subscription();
   private destroy$ = new Subject<void>();
 
-  protected metrics = signal<KpiMetric[]>([
-    {
-      id: 'distance',
-      name: 'Distancia',
-      value: '21.30',
-      unit: 'km',
-      description: 'DISTANCE',
-      isPrimary: true,
-      accentType: 'distance',
-      badge: {
-        text: 'Target 21k',
-        type: 'accent',
-      },
-      tooltip: 'Filter map track by distance milestones',
-    },
-    {
-      id: 'time',
-      name: 'Tiempo',
-      value: '1:55:39',
-      unit: '',
-      description: 'TIME',
-      accentType: 'time',
-      badge: {
-        text: '-3:20',
-        type: 'positive',
-      },
-      tooltip: 'Filter telemetry timeline by duration',
-    },
-    {
-      id: 'pace',
-      name: 'Ritmo medio',
-      value: '5:26',
-      unit: '/km',
-      description: 'AVG PACE',
-      accentType: 'pace',
-      badge: {
-        text: '+0:12',
-        type: 'warning',
-      },
-      tooltip: 'Highlight fast & slow pace splits on GPS track',
-    },
-    {
-      id: 'elevation',
-      name: 'Ascenso total',
-      value: '180',
-      unit: 'm',
-      description: 'ELEVATION',
-      accentType: 'elevation',
-      badge: {
-        text: '+4.2%',
-        type: 'neutral',
-      },
-      tooltip: 'Highlight elevation spikes on map & profile chart',
-    },
-    {
-      id: 'calories',
-      name: 'Calorías',
-      value: '1,051',
-      unit: 'kcal',
-      description: 'CALORIES',
-      accentType: 'calories',
-      badge: {
-        text: '105% Goal',
-        type: 'neutral',
-      },
-      tooltip: 'Show metabolic burn rate intervals',
-    },
-  ]);
+  protected metrics = signal<KpiMetric[]>([]);
 
   constructor(private generalService: GeneralService,
       private sseEndpointService: SseEndpointService) {}
@@ -125,17 +60,52 @@ export class AppKpiSumary implements OnInit, OnDestroy {
   }
 
   private setSubscriptionToSummaryData(summaryData: boolean): void{
-    if(summaryData){
-      this.subscriptions.add(
-        this.sseEndpointService.getSummaryData().subscribe({
-          next: (response) => {
-            console.log('Summary Data received:', response);
-          },
-          error: (err) =>{
-            console.log('Summary Data error:', err);
-          },
-        })
-      );
+    if (!summaryData) {
+      return;
     }
+
+    this.subscriptions.add(
+      this.sseEndpointService.getSummaryData().subscribe({
+        next: (response) => {
+          const summary = (response?.data && typeof response.data === 'object' && !Array.isArray(response.data))
+            ? response.data as GarminSummaryModel
+            : null;
+
+          this.metrics.set(this.buildMetrics(summary));
+          console.log('Summary Data received:', response);
+        },
+        error: (err) =>{
+          console.log('Summary Data error:', err);
+        },
+      })
+    );
+  }
+
+  private buildMetrics(summary: GarminSummaryModel | null): KpiMetric[] {
+    if (!summary) {
+      return [];
+    }
+
+    const summaryRecord = summary as unknown as Record<string, number | undefined>;
+
+    return Object.keys(kpiSummaryMetricConfig)
+      .filter((metricId) => typeof summaryRecord[metricId] !== 'undefined')
+      .map((metricId) => {
+        const config = kpiSummaryMetricConfig[metricId];
+        const rawValue = Number(summaryRecord[metricId] ?? 0);
+        const value = config.formatter ? config.formatter(rawValue) : String(rawValue);
+
+        return {
+          id: metricId,
+          name: config.name,
+          value,
+          unit: config.unit,
+          description: config.description,
+          isPrimary: config.isPrimary,
+          accentType: config.accentType,
+          badge: config.badge,
+          tooltip: config.tooltip,
+        } satisfies KpiMetric;
+      });
   }
 }
